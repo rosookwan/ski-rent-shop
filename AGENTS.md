@@ -1,7 +1,7 @@
 # AGENTS.md — 개발 에이전트 가이드
 
-무주 스키 렌탈샵 "준스키타운" 홈페이지. **고객 시연용 프로토타입**으로, 백엔드 없이
-정적 사이트 + localStorage로 동작한다. 실서비스 백엔드 전환은 M3에서 진행한다.
+무주 스키 렌탈샵 "준스키타운" 홈페이지. 현재 배포본은 정적 사이트 + localStorage로
+동작하며, M3에서 FastAPI + SQLite 백엔드를 구축해 실서비스 구조로 전환한다.
 
 - 배포: https://rosookwan.github.io/ski-rent-shop/ (main 푸시 시 GitHub Pages 자동 배포)
 - 계획: [docs/development-plan.md](docs/development-plan.md) — 마일스톤(M1–M4) 정의
@@ -12,6 +12,10 @@
 
 ```bash
 python3 -m http.server 8080   # 빌드 없음. http://localhost:8080 접속
+
+cd backend
+source .venv/bin/activate
+python -m unittest discover -s tests -v
 ```
 
 작업 후 반드시 확인할 것:
@@ -19,6 +23,7 @@ python3 -m http.server 8080   # 빌드 없음. http://localhost:8080 접속
 2. 핵심 플로우: 홈 → 셀프견적 담기 → 문의 등록 → 관리자(문의 답변 탭)에 표시
 3. 모바일 폭(<900px)과 데스크톱 폭 양쪽 레이아웃
 4. `node --check js/*.js` 통과
+5. 백엔드 변경 시 `backend` 디렉터리에서 `python -m unittest discover -s tests -v` 통과
 
 ## 소스 구조
 
@@ -31,6 +36,7 @@ js/{home,notice,inquiry,estimate}.js  # 사용자 페이지 로직
 js/admin.js            # 관리자 페이지 로직 (site.js 미사용, store.js만 사용)
 assets/img/            # 이미지
 docs/                  # 계획서·아키텍처·요구사항
+backend/               # M3 FastAPI 앱·SQLite 마이그레이션·테스트
 ```
 
 스크립트 로드 순서: 사용자 페이지 `store.js → site.js → 페이지.js`, 관리자 `store.js → admin.js`.
@@ -50,8 +56,8 @@ docs/                  # 계획서·아키텍처·요구사항
    - 클릭은 `data-action` 속성 + 이벤트 위임
    - 텍스트 입력은 `input` 이벤트로 상태만 갱신하고 **재렌더하지 않는다** (포커스 유지).
      재렌더는 클릭 액션에서만.
-5. **빌드 도구·프레임워크·npm 의존성 추가 금지**: 바닐라 HTML/CSS/JS 유지. 외부
-   리소스는 Pretendard CDN뿐이다.
+5. **프론트 빌드 도구·프레임워크·npm 의존성 추가 금지**: 바닐라 HTML/CSS/JS 유지.
+   백엔드는 M3 요구사항의 FastAPI 구성을 따른다. 외부 프론트 리소스는 Pretendard CDN뿐이다.
 6. **UI 문구는 모두 한국어**, 존댓말("~해요" 톤)로 기존 문구와 통일.
 7. **페이지 URL 변경 금지**: html 파일명·경로 변경은 배포된 링크를 깨뜨린다.
 

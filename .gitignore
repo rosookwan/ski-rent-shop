@@ -1,0 +1,11 @@
+# Python backend runtime
+backend/.venv/
+backend/.env
+backend/__pycache__/
+backend/**/__pycache__/
+backend/data/
+backend/uploads/
+*.py[cod]
+
+# Local editor and OS files
+.DS_Store
