@@ -19,7 +19,6 @@
     discountConfig: JSTStore.loadDiscountConfig(),
     notices: JSTStore.loadNotices(),
     inquiries: JSTStore.loadInquiries(),
-    expandedInquiryId: null,
     answerDrafts: {},
     showResetConfirm: false,
     draftName: '', draftDesc: '', draftPrice: '', draftError: '',
@@ -27,6 +26,8 @@
     noticeView: 'list', noticeSearch: '', noticePage: 1,
     noticeEditingId: null, noticeDeleteId: null,
     noticeFormTag: '', noticeFormTitle: '', noticeFormBody: '', noticeFormPinned: false, noticeError: '',
+    inquiryView: 'list', inquiryFilter: 'all', inquirySearch: '', inquiryPage: 1,
+    selectedInquiryId: null,
   };
 
   var TABS = [
@@ -92,6 +93,20 @@
       var on = state.activeTab === t.key;
       return '<button data-action="set-tab" data-tab="' + t.key + '" style="' + (on ? S.tabOn : S.tabOff) + '">' + t.label + '</button>';
     }).join('');
+  }
+
+  function renderAdminSummary() {
+    var pendingCount = state.inquiries.filter(function (q) { return q.status !== '답변완료'; }).length;
+    var itemCount = CATALOG_TABS.reduce(function (total, cat) {
+      return total + (state.catalog[cat] || []).length;
+    }, 0);
+    return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:14px 16px;border:1px solid #E6E8EC;border-radius:14px;background:#F8F9FA;font-size:13.5px;font-weight:700;color:#4B5563;">' +
+      '<button data-action="open-pending-inquiries" style="padding:0;border:none;background:none;color:#E85425;font:inherit;font-weight:800;cursor:pointer;text-decoration:underline;text-underline-offset:3px;">답변대기 문의 ' + pendingCount + '건</button>' +
+      '<span aria-hidden="true" style="color:#C3C9D2;">·</span>' +
+      '<span>공지 ' + state.notices.length + '건</span>' +
+      '<span aria-hidden="true" style="color:#C3C9D2;">·</span>' +
+      '<span>품목 ' + itemCount + '개</span>' +
+    '</div>';
   }
 
   function discountLabel(section) {
@@ -402,48 +417,126 @@
     return state.noticeView === 'form' ? renderNoticeForm() : renderNoticeList();
   }
 
-  function renderInquiryTab() {
-    var html = '<div style="display:flex;flex-direction:column;gap:10px;">';
-    state.inquiries.forEach(function (q) {
-      var expanded = state.expandedInquiryId === q.id;
-      var done = q.status === '답변완료';
-      var draft = state.answerDrafts[q.id] !== undefined ? state.answerDrafts[q.id] : (q.answer || '');
-      html += '<div style="border:1px solid #E6E8EC;border-radius:14px;overflow:hidden;">' +
-        '<button data-action="toggle-inquiry" data-id="' + q.id + '" style="width:100%;display:flex;align-items:center;gap:10px;padding:14px;background:none;border:none;cursor:pointer;text-align:left;font-family:inherit;">' +
-          (q.secret ? '<span style="flex:none;font-size:13px;">🔒</span>' : '') +
-          '<span style="flex:1;min-width:0;font-size:14px;color:#14263F;font-weight:700;">' + esc(q.title) + '</span>' +
-          '<span style="flex:none;padding:3px 9px;border-radius:6px;font-size:11px;font-weight:800;background:' + (done ? '#E9F7EF' : '#F0F1F3') + ';color:' + (done ? '#1F9254' : '#6B7280') + ';white-space:nowrap;">' + esc(q.status) + '</span>' +
-          '<span style="flex:none;font-size:12px;color:#8A93A1;white-space:nowrap;">' + esc(q.date) + '</span>' +
-          '<span style="flex:none;color:#8A93A1;font-size:12px;font-weight:700;white-space:nowrap;">' + (expanded ? '접기 ▲' : '펼치기 ▼') + '</span>' +
-        '</button>';
-      if (expanded) {
-        html += '<div style="padding:0 14px 16px;display:flex;flex-direction:column;gap:12px;border-top:1px solid #F0F1F3;">' +
-          '<div style="display:flex;flex-wrap:wrap;gap:6px 16px;padding-top:12px;font-size:12.5px;color:#8A93A1;font-weight:600;">' +
-            '<span>이름 ' + esc(q.name && q.name.trim() ? q.name : '-') + '</span>' +
-            '<span>연락처 ' + esc(q.contact && q.contact.trim() ? q.contact : '-') + '</span>' +
-            '<span>이메일 ' + esc(q.email && q.email.trim() ? q.email : '-') + '</span>' +
-          '</div>' +
-          '<div>' +
-            '<div style="font-size:12px;font-weight:700;color:#4B5563;margin-bottom:6px;">문의 내용</div>' +
-            '<div style="padding:12px 14px;border-radius:10px;background:#F5F6F8;font-size:13.5px;color:#374151;line-height:1.7;white-space:pre-wrap;">' + esc(q.content && q.content.trim() ? q.content : '(등록된 문의 내용이 없어요)') + '</div>' +
-          '</div>' +
-          '<div>' +
-            '<div style="font-size:12px;font-weight:700;color:#4B5563;margin-bottom:6px;">답변</div>' +
-            '<textarea data-input="answer-draft" data-id="' + q.id + '" placeholder="답변을 입력하세요" rows="4" style="padding:10px 12px;border-radius:10px;border:1.5px solid #E6E8EC;font-size:13.5px;color:#14263F;width:100%;line-height:1.6;resize:vertical;font-family:inherit;">' + esc(draft) + '</textarea>' +
-          '</div>' +
-          '<div style="display:flex;gap:8px;">' +
-            '<button data-action="save-answer" data-id="' + q.id + '" style="flex:1;padding:11px;border-radius:10px;border:none;background:#14263F;color:#FFFFFF;font-weight:700;font-size:13.5px;cursor:pointer;font-family:inherit;">' + (done ? '답변 수정하기' : '답변 등록하기') + '</button>' +
-            '<button data-action="remove-inquiry" data-id="' + q.id + '" style="flex:none;padding:11px 16px;border-radius:10px;border:1.5px solid #F3D9D6;background:#FDF3F2;color:#E0483E;font-weight:700;font-size:13.5px;cursor:pointer;font-family:inherit;">삭제</button>' +
-          '</div>' +
-        '</div>';
-      }
-      html += '</div>';
+  function findInquiryById(id) {
+    return state.inquiries.find(function (q) { return String(q.id) === String(id); });
+  }
+
+  function pendingInquiryCount() {
+    return state.inquiries.filter(function (q) { return q.status !== '답변완료'; }).length;
+  }
+
+  function filteredInquiries() {
+    var query = (state.inquirySearch || '').trim().toLowerCase();
+    return state.inquiries.filter(function (q) {
+      var isDone = q.status === '답변완료';
+      if (state.inquiryFilter === 'pending' && isDone) return false;
+      if (state.inquiryFilter === 'done' && !isDone) return false;
+      if (!query) return true;
+      return String(q.title || '').toLowerCase().indexOf(query) !== -1 ||
+        String(q.name || '').toLowerCase().indexOf(query) !== -1 ||
+        String(q.contact || '').toLowerCase().indexOf(query) !== -1;
     });
-    if (state.inquiries.length === 0) {
-      html += '<div style="font-size:13px;color:#8A93A1;padding:8px 0;">등록된 문의가 없어요.</div>';
+  }
+
+  function renderInquiryPagination(totalPages) {
+    if (totalPages <= 1) return '';
+    var start = Math.max(1, Math.min(state.inquiryPage - 2, totalPages - 4));
+    var end = Math.min(totalPages, start + 4);
+    var html = '<div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:16px;flex-wrap:wrap;">' +
+      '<button data-action="inquiry-page" data-page="' + Math.max(1, state.inquiryPage - 1) + '"' + (state.inquiryPage === 1 ? ' disabled' : '') + ' aria-label="이전 페이지" style="width:36px;height:36px;border-radius:9px;border:1px solid #E6E8EC;background:#FFFFFF;color:#4B5563;font-weight:800;cursor:' + (state.inquiryPage === 1 ? 'not-allowed' : 'pointer') + ';opacity:' + (state.inquiryPage === 1 ? '.42' : '1') + ';font-family:inherit;">◀</button>';
+    for (var page = start; page <= end; page++) {
+      var active = page === state.inquiryPage;
+      html += '<button data-action="inquiry-page" data-page="' + page + '"' + (active ? ' aria-current="page"' : '') + ' style="width:36px;height:36px;border-radius:9px;border:' + (active ? 'none' : '1px solid #E6E8EC') + ';background:' + (active ? '#14263F' : '#FFFFFF') + ';color:' + (active ? '#FFFFFF' : '#4B5563') + ';font-weight:800;cursor:pointer;font-family:inherit;">' + page + '</button>';
     }
-    html += '</div>';
+    html += '<button data-action="inquiry-page" data-page="' + Math.min(totalPages, state.inquiryPage + 1) + '"' + (state.inquiryPage === totalPages ? ' disabled' : '') + ' aria-label="다음 페이지" style="width:36px;height:36px;border-radius:9px;border:1px solid #E6E8EC;background:#FFFFFF;color:#4B5563;font-weight:800;cursor:' + (state.inquiryPage === totalPages ? 'not-allowed' : 'pointer') + ';opacity:' + (state.inquiryPage === totalPages ? '.42' : '1') + ';font-family:inherit;">▶</button></div>';
     return html;
+  }
+
+  function renderInquiryListResults() {
+    var inquiries = filteredInquiries();
+    var totalPages = Math.max(1, Math.ceil(inquiries.length / 10));
+    state.inquiryPage = Math.max(1, Math.min(state.inquiryPage, totalPages));
+    var pageInquiries = inquiries.slice((state.inquiryPage - 1) * 10, state.inquiryPage * 10);
+    var html = '<div style="font-size:12.5px;font-weight:700;color:#8A93A1;margin-bottom:12px;">' + inquiries.length + '건</div>' +
+      '<div style="border:1px solid #E6E8EC;border-radius:14px;overflow:hidden;">';
+    pageInquiries.forEach(function (q) {
+      var done = q.status === '답변완료';
+      html += '<button data-action="open-inquiry" data-id="' + esc(q.id) + '" style="width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:14px;border:none;border-bottom:1px solid #F0F1F3;background:#FFFFFF;text-align:left;cursor:pointer;font-family:inherit;align-items:center;">' +
+        '<span style="min-width:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
+          (q.secret ? '<span aria-label="비밀글" style="flex:none;font-size:13px;">🔒</span>' : '') +
+          '<span style="min-width:140px;flex:1;font-size:14px;color:#14263F;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(q.title) + '</span>' +
+          '<span style="flex:none;font-size:12px;color:#8A93A1;font-weight:600;white-space:nowrap;">' + esc(q.name && q.name.trim() ? q.name : '이름 미입력') + '</span>' +
+        '</span>' +
+        '<span style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:flex-end;">' +
+          '<span style="padding:3px 9px;border-radius:6px;font-size:11px;font-weight:800;background:' + (done ? '#E9F7EF' : '#F0F1F3') + ';color:' + (done ? '#1F9254' : '#6B7280') + ';white-space:nowrap;">' + esc(done ? '답변완료' : '답변대기') + '</span>' +
+          '<span style="font-size:12px;color:#8A93A1;white-space:nowrap;">' + esc(q.date) + '</span>' +
+        '</span>' +
+      '</button>';
+    });
+    if (!pageInquiries.length) {
+      html += '<div style="padding:28px 18px;text-align:center;font-size:13px;color:#8A93A1;">' + (state.inquirySearch ? '검색 결과가 없어요.' : '조건에 맞는 문의가 없어요.') + '</div>';
+    }
+    html += '</div>' + renderInquiryPagination(totalPages);
+    return html;
+  }
+
+  function updateInquiryListResults() {
+    var target = document.getElementById('inquiry-list-results');
+    if (target) target.innerHTML = renderInquiryListResults();
+  }
+
+  function renderInquiryList() {
+    function filterButton(filter, label) {
+      var on = state.inquiryFilter === filter;
+      return '<button data-action="set-inquiry-filter" data-filter="' + filter + '" style="' + (on ? S.pillOn : S.pillOff) + '">' + label + '</button>';
+    }
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap;">' +
+      '<div style="display:flex;gap:7px;flex-wrap:wrap;">' +
+        filterButton('all', '전체') +
+        filterButton('pending', '답변대기 (' + pendingInquiryCount() + ')') +
+        filterButton('done', '답변완료') +
+      '</div>' +
+      '<input type="search" data-input="inquiry-search" value="' + esc(state.inquirySearch) + '" placeholder="제목, 이름 또는 연락처 검색" aria-label="문의 검색" style="flex:1;min-width:220px;max-width:360px;' + S.input + '" />' +
+    '</div>' +
+    '<div id="inquiry-list-results">' + renderInquiryListResults() + '</div>';
+  }
+
+  function renderInquiryDetail() {
+    var q = findInquiryById(state.selectedInquiryId);
+    if (!q) {
+      state.inquiryView = 'list';
+      state.selectedInquiryId = null;
+      return renderInquiryList();
+    }
+    var done = q.status === '답변완료';
+    var draft = state.answerDrafts[String(q.id)] !== undefined ? state.answerDrafts[String(q.id)] : (q.answer || '');
+    return '<div style="display:flex;flex-direction:column;gap:18px;">' +
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">' +
+        '<div style="min-width:0;">' +
+          '<span style="display:inline-block;margin-bottom:9px;padding:4px 9px;border-radius:6px;font-size:11px;font-weight:800;background:' + (done ? '#E9F7EF' : '#F0F1F3') + ';color:' + (done ? '#1F9254' : '#6B7280') + ';">' + esc(done ? '답변완료' : '답변대기') + '</span>' +
+          '<div style="font-size:19px;font-weight:800;color:#14263F;line-height:1.4;overflow-wrap:anywhere;">' + (q.secret ? '<span aria-label="비밀글">🔒 </span>' : '') + esc(q.title) + '</div>' +
+        '</div>' +
+        '<span style="flex:none;font-size:12px;color:#8A93A1;font-weight:600;">' + esc(q.date) + '</span>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:9px;padding:14px;border-radius:12px;background:#F8F9FA;">' +
+        '<div><span style="display:block;font-size:11.5px;font-weight:700;color:#8A93A1;margin-bottom:4px;">이름</span><span style="font-size:13.5px;font-weight:700;color:#14263F;overflow-wrap:anywhere;">' + esc(q.name && q.name.trim() ? q.name : '-') + '</span></div>' +
+        '<div><span style="display:block;font-size:11.5px;font-weight:700;color:#8A93A1;margin-bottom:4px;">연락처</span><span style="font-size:13.5px;font-weight:700;color:#14263F;overflow-wrap:anywhere;">' + esc(q.contact && q.contact.trim() ? q.contact : '-') + '</span></div>' +
+        '<div><span style="display:block;font-size:11.5px;font-weight:700;color:#8A93A1;margin-bottom:4px;">이메일</span><span style="font-size:13.5px;font-weight:700;color:#14263F;overflow-wrap:anywhere;">' + esc(q.email && q.email.trim() ? q.email : '-') + '</span></div>' +
+      '</div>' +
+      '<div><div style="font-size:12px;font-weight:700;color:#4B5563;margin-bottom:7px;">문의 내용</div>' +
+        '<div style="padding:14px 16px;border-radius:11px;background:#F5F6F8;font-size:13.5px;color:#374151;line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere;">' + esc(q.content && q.content.trim() ? q.content : '(등록된 문의 내용이 없어요)') + '</div></div>' +
+      '<label style="display:flex;flex-direction:column;gap:7px;"><span style="font-size:12px;font-weight:700;color:#4B5563;">답변</span>' +
+        '<textarea data-input="answer-draft" data-id="' + esc(q.id) + '" placeholder="답변을 입력해주세요" rows="7" style="' + S.input + 'line-height:1.65;resize:vertical;font-family:inherit;">' + esc(draft) + '</textarea></label>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+        '<button data-action="save-answer" data-id="' + esc(q.id) + '" style="flex:1;min-width:150px;' + S.primaryBtn + '">' + (done ? '답변 수정' : '답변 등록') + '</button>' +
+        '<button data-action="remove-inquiry" data-id="' + esc(q.id) + '" style="padding:12px 16px;border-radius:11px;border:1.5px solid #F3D9D6;background:#FDF3F2;color:#E0483E;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">삭제</button>' +
+        '<button data-action="back-inquiry-list" style="padding:12px 16px;border-radius:11px;border:1.5px solid #E6E8EC;background:#FFFFFF;color:#4B5563;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">목록으로</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function renderInquiryTab() {
+    return state.inquiryView === 'detail' ? renderInquiryDetail() : renderInquiryList();
   }
 
   function findNoticeById(id) {
@@ -463,6 +556,7 @@
     var meta = pageMeta();
     document.getElementById('pageTitle').textContent = meta.title;
     document.getElementById('pageDesc').textContent = meta.desc;
+    document.getElementById('adminSummary').innerHTML = renderAdminSummary();
     document.getElementById('tabBar').innerHTML = renderTabs();
 
     var panel = document.getElementById('panel');
@@ -483,6 +577,16 @@
     'set-tab': function (el) {
       state.activeTab = el.dataset.tab;
       if (state.activeTab === 'notice') state.noticeView = 'list';
+      if (state.activeTab === 'inquiry') state.inquiryView = 'list';
+      renderAll();
+    },
+    'open-pending-inquiries': function () {
+      state.activeTab = 'inquiry';
+      state.inquiryView = 'list';
+      state.inquiryFilter = 'pending';
+      state.inquirySearch = '';
+      state.inquiryPage = 1;
+      state.selectedInquiryId = null;
       renderAll();
     },
 
@@ -603,24 +707,43 @@
       persistNotices(); renderAll();
     },
 
-    'toggle-inquiry': function (el) {
-      var id = Number(el.dataset.id);
-      state.expandedInquiryId = state.expandedInquiryId === id ? null : id;
+    'set-inquiry-filter': function (el) {
+      state.inquiryFilter = el.dataset.filter;
+      state.inquiryPage = 1;
+      renderAll();
+    },
+    'inquiry-page': function (el) {
+      state.inquiryPage = Math.max(1, Number(el.dataset.page) || 1);
+      updateInquiryListResults();
+    },
+    'open-inquiry': function (el) {
+      var q = findInquiryById(el.dataset.id);
+      if (!q) return;
+      state.selectedInquiryId = q.id;
+      state.inquiryView = 'detail';
+      renderAll();
+    },
+    'back-inquiry-list': function () {
+      state.inquiryView = 'list';
+      state.selectedInquiryId = null;
       renderAll();
     },
     'save-answer': function (el) {
-      var id = Number(el.dataset.id);
-      var q = state.inquiries.find(function (x) { return x.id === id; });
+      var id = String(el.dataset.id);
+      var q = findInquiryById(id);
       if (!q) return;
       var draft = (state.answerDrafts[id] !== undefined ? state.answerDrafts[id] : (q.answer || '')).trim();
       q.answer = draft;
       q.status = draft ? '답변완료' : '답변대기';
+      state.answerDrafts[id] = draft;
       persistInquiries(); renderAll();
     },
     'remove-inquiry': function (el) {
-      var id = Number(el.dataset.id);
-      state.inquiries = state.inquiries.filter(function (x) { return x.id !== id; });
-      if (state.expandedInquiryId === id) state.expandedInquiryId = null;
+      var id = String(el.dataset.id);
+      state.inquiries = state.inquiries.filter(function (x) { return String(x.id) !== id; });
+      delete state.answerDrafts[id];
+      state.inquiryView = 'list';
+      state.selectedInquiryId = null;
       persistInquiries(); renderAll();
     },
   };
@@ -660,8 +783,12 @@
       state.noticeSearch = v;
       state.noticePage = 1;
       updateNoticeListResults();
+    } else if (kind === 'inquiry-search') {
+      state.inquirySearch = v;
+      state.inquiryPage = 1;
+      updateInquiryListResults();
     } else if (kind === 'answer-draft') {
-      state.answerDrafts[Number(el.dataset.id)] = v;
+      state.answerDrafts[String(el.dataset.id)] = v;
     } else if (kind === 'draft-name') { state.draftName = v; state.draftError = ''; }
     else if (kind === 'draft-desc') { state.draftDesc = v; }
     else if (kind === 'draft-price') { state.draftPrice = v; state.draftError = ''; }
