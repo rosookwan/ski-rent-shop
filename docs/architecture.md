@@ -2,7 +2,7 @@
 
 ## 1. 전체 구조
 
-빌드 도구 없는 정적 사이트. 페이지별 HTML이 루트에 있고, 스크립트는 3계층이다.
+빌드 도구 없는 정적 사이트. 페이지별 HTML이 루트에 있고, 스크립트는 4계층이다.
 
 ```
 ┌─ 페이지 스크립트 ──────────────────────────────────────────┐
@@ -11,12 +11,14 @@
 ├─ 공통 UI (사용자 화면만) ──────────────────────────────────┤
 │ js/site.js   → window.JST (JSTStore 포함 + 헤더/푸터)      │  헤더·푸터 주입
 ├─ 데이터 계층 ──────────────────────────────────────────────┤
-│ js/store.js  → window.JSTStore                             │  localStorage 캡슐화
+│ js/store.js  → window.JSTStore                             │  API·임시 데이터 캡슐화
+├─ 환경 설정 ────────────────────────────────────────────────┤
+│ js/config.js → window.JSTConfig                            │  API 기준 URL
 └────────────────────────────────────────────────────────────┘
 ```
 
-- 사용자 페이지: `store.js → site.js → 페이지.js` 순서로 로드. 페이지 코드는 `JST.*`만 사용.
-- 관리자 페이지: `store.js → admin.js`. 헤더/푸터가 없으므로 site.js를 로드하지 않고 `JSTStore.*`를 직접 사용.
+- 사용자 페이지: `config.js → store.js → site.js → 페이지.js` 순서로 로드. 페이지 코드는 `JST.*`만 사용.
+- 관리자 페이지: `config.js → store.js → admin.js`. 헤더/푸터가 없으므로 site.js를 로드하지 않고 `JSTStore.*`를 직접 사용.
 - 공통 스타일은 `css/base.css`, 페이지 고유 스타일(예: index의 `.hero`)은 각 html의 `<style>`.
 - 나머지 스타일은 디자인 시안 그대로 **인라인 style 속성** 방식이다. 반복되는 조각은 각 페이지 스크립트 상단의 `S` 객체(스타일 문자열 상수)로 관리한다.
 
@@ -28,37 +30,25 @@
 | notice.html | notice.js | 공지 목록/상세. `?id=N`으로 상세 직접 진입 | |
 | inquiry.html | inquiry.js | 문의 목록/상세/글쓰기. `?mode=write&from=estimate`로 견적 첨부 글쓰기 진입 | |
 | estimate.html | estimate.js | 셀프견적. 날짜별 담기, 확인 모달 | 문의하기 → inquiry.html (jst_estimate 전달) |
-| admin-login.html | (인라인) | 관리자 로그인 (프로토타입: 검증 없음) | 로그인 → admin.html |
+| admin-login.html | (인라인) | 서버 관리자 인증 | 로그인 → admin.html |
 | admin.html | admin.js | 관리자: 품목/할인/공지/문의 탭 | 세션 없으면 admin-login.html로 리다이렉트 |
 
 ## 3. 데이터 계층 (js/store.js)
 
-**규칙: localStorage 접근은 이 파일에서만 한다.** 페이지 코드는 `JST.loadNotices()` /
-`JST.saveNotices(list)` 형태만 호출한다. 키 문자열도 `JST.KEYS.*`로 참조한다.
+**규칙: API와 localStorage 접근은 이 파일에서만 한다.** 페이지 코드는 `JST.loadNotices()` /
+`JST.createInquiry(payload)` 같은 Promise API만 호출한다. 서버 공유 데이터는 API 실패 시
+localStorage로 대체하거나 이전 브라우저 데이터를 자동 업로드하지 않는다.
 
-### 스키마 (localStorage 키 → 값 형태)
+### 서버 공유 데이터
+
+공지·문의·렌탈 품목·할인 설정·관리자 인증·공지 첨부는 FastAPI와 SQLite가 관리한다.
+공개 화면은 공개 API를, 관리자 화면은 HttpOnly 세션 쿠키가 필요한 관리자 API를 사용한다.
+모든 초기 조회와 저장 액션은 비동기이며, 화면은 로딩·빈 상태·재시도 가능한 오류 상태를
+명시적으로 렌더링한다. API 경로와 스키마는 `docs/requirements/M3-backend-migration.md`를 따른다.
+
+### 브라우저 임시 데이터 (localStorage 키 → 값 형태)
 
 ```js
-// jst_catalog — 렌탈 품목. 카테고리 4종 고정
-{ lift: [Item], equipment: [Item], clothing: [Item], safety: [Item] }
-// Item
-{ id: 'full', name: '종일권', desc: '09:00–17:00', price: 55000,
-  discountGeneral: 0, discountAffiliate: 0, hidden: false }
-// hidden=true이면 셀프견적에서 숨김. 할인 값은 품목별 정액할인 오버라이드(0=기본값 사용)
-
-// jst_discount_config — 할인 설정
-{ general:   { enabled: true, type: 'percent'|'fixed', value: 5 },
-  affiliate: { enabled: true, type: 'percent'|'fixed', value: 12 },
-  keywords: ['여행사', '패키지', '제휴'] }      // 제휴업체명 부분일치 판정용
-
-// jst_notices — 공지 배열 (최신이 앞)
-[{ id: 1, tag: '공지', title: '...', date: '2026.11.20', body: '...' }]
-
-// jst_inquiries — 문의 배열 (최신이 앞)
-[{ id: 1, title: '...', date: '2026.07.10', status: '답변대기'|'답변완료',
-   secret: true, password: '1234',            // 프로토타입: 평문. M3에서 해시로
-   name: '', contact: '', email: '', content: '...', answer: '' }]
-
 // jst_estimate — 셀프견적 → 문의 글쓰기 전달 페이로드 (1회성)
 { tripInfo: '12/24(목) – 12/26(토) · 2박3일 · 대인 2', affiliateType: 'none'|'affiliate',
   affiliateName: '', lines: [{ group, label, qty, subtotal, subtotalValue, cat, itemId }],
@@ -71,8 +61,6 @@
 
 // jst_trip_info — 홈 → 셀프견적 전달 일정·인원
 { undecided: false, start: '2026-12-24', end: '2026-12-26', adult: 2, child: 0 }
-
-// jst_admin_session — '1'이면 로그인 상태 (프로토타입)
 ```
 
 ### 할인 계산 규칙 (inquiry.js의 견적 첨부 박스에서 사용)
@@ -99,19 +87,14 @@ document.getElementById('app').addEventListener('click', function (e) {
 ```
 
 - 사용자 입력을 HTML에 넣을 때는 반드시 `esc()`.
-- 탭 간 실시간 동기화: `window.addEventListener('storage', ...)`로 해당 키 변경 시 다시 로드.
+- 서버 데이터는 페이지 초기화와 저장 완료 시 다시 반영하며, 네트워크 오류에는 재시도 동작을 제공한다.
 - 관리자 저장 피드백: `showFlash()` → "✓ 저장됨" 1.6초 표시.
 
-## 5. M3(백엔드) 전환 계획
+## 5. M3 백엔드 구조
 
-목표: **js/store.js만 API 구현으로 교체**하면 페이지 코드가 그대로 동작하는 것.
-
-- load*/save* 함수가 async(Promise)로 바뀌므로, 호출부는 `await` 또는 `.then()`으로
-  조정이 필요하다. 페이지 초기화 코드를 `async function init()` 패턴으로 감싸는 정도의
-  변경으로 끝나도록, **store 호출을 페이지당 한 곳(초기화)과 저장 액션에만** 유지할 것.
-- `jst_trip_info`/`jst_estimate` 같은 페이지 간 전달 데이터는 서버로 옮기지 않고
-  localStorage(또는 sessionStorage)에 남겨도 된다 — 같은 브라우저 안의 전달이므로.
-- 테이블 설계 초안은 docs/development-plan.md §7 참고.
+R13에서 브라우저 데이터 계층을 Promise 기반 API로 전환했다. `jst_trip_info`와
+`jst_estimate`, `jst_estimate_draft`는 같은 브라우저 안의 페이지 전달·복구 용도이므로
+localStorage에 유지한다.
 
 ### 확정된 목표 구조
 

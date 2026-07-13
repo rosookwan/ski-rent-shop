@@ -1,24 +1,18 @@
 /**
  * 관리자 페이지 로직 (Admin.dc.html 디자인 구현)
  * 데이터 조회/저장은 JSTStore(js/store.js)를 통해서만 한다.
- * 로드 순서: store.js → admin.js
+ * 로드 순서: config.js → store.js → admin.js
  */
 (function () {
   'use strict';
 
-  // ── 로그인 세션 확인 (프로토타입: 실제 인증은 M3) ───────────
-  if (!JSTStore.hasAdminSession()) {
-    window.location.replace('admin-login.html');
-    return;
-  }
-
   // ── 상태 ────────────────────────────────────────────────────
   var state = {
     activeTab: 'lift',
-    catalog: JSTStore.loadCatalog(),
-    discountConfig: JSTStore.loadDiscountConfig(),
-    notices: JSTStore.loadNotices(),
-    inquiries: JSTStore.loadInquiries(),
+    catalog: JSTStore.defaultCatalog(),
+    discountConfig: JSTStore.defaultDiscountConfig(),
+    notices: [], inquiries: [],
+    loading: true, loadError: '', operationError: '', saving: false,
     answerDrafts: {},
     showResetConfirm: false,
     draftName: '', draftDesc: '', draftPrice: '', draftError: '',
@@ -26,6 +20,7 @@
     noticeView: 'list', noticeSearch: '', noticePage: 1,
     noticeEditingId: null, noticeDeleteId: null,
     noticeFormTag: '', noticeFormTitle: '', noticeFormBody: '', noticeFormPinned: false, noticeError: '',
+    noticeFiles: [], noticePendingFiles: [],
     inquiryView: 'list', inquiryFilter: 'all', inquirySearch: '', inquiryPage: 1,
     selectedInquiryId: null,
   };
@@ -41,7 +36,7 @@
   ];
   var CATALOG_TABS = ['lift', 'equipment', 'clothing', 'safety'];
 
-  // ── 저장 + "저장됨" 표시 ─────────────────────────────────────
+  // ── 저장 + 상태 표시 ─────────────────────────────────────────
   var flashTimer = null;
   function showFlash() {
     var el = document.getElementById('savedFlash');
@@ -49,12 +44,47 @@
     clearTimeout(flashTimer);
     flashTimer = setTimeout(function () { el.style.display = 'none'; }, 1600);
   }
-  var persistCatalog = function () { JSTStore.saveCatalog(state.catalog); showFlash(); };
-  var persistDiscount = function () { JSTStore.saveDiscountConfig(state.discountConfig); showFlash(); };
-  var persistNotices = function () { JSTStore.saveNotices(state.notices); showFlash(); };
-  var persistInquiries = function () { JSTStore.saveInquiries(state.inquiries); showFlash(); };
+  function handleError(error, fallback) {
+    if (error && error.status === 401) {
+      window.location.replace('admin-login.html?expired=1');
+      return;
+    }
+    state.operationError = (error && error.message) || fallback || '변경사항을 저장하지 못했어요.';
+    renderAll();
+  }
 
-  var todayDateStr = JSTStore.todayDateStr;
+  var catalogSaveTimers = {};
+  function queueCatalogSave(cat, item) {
+    var key = cat + ':' + item.id;
+    clearTimeout(catalogSaveTimers[key]);
+    catalogSaveTimers[key] = setTimeout(async function () {
+      try {
+        var saved = await JSTStore.updateCatalogItem(cat, item.id, item);
+        Object.assign(item, saved);
+        state.operationError = '';
+        showFlash();
+      } catch (error) {
+        handleError(error);
+      }
+    }, 500);
+  }
+
+  var discountSaveTimer = null;
+  function persistDiscount(immediate) {
+    clearTimeout(discountSaveTimer);
+    var save = async function () {
+      try {
+        state.discountConfig = await JSTStore.saveDiscountConfig(state.discountConfig);
+        state.operationError = '';
+        showFlash();
+      } catch (error) {
+        handleError(error);
+      }
+    };
+    if (immediate) save();
+    else discountSaveTimer = setTimeout(save, 500);
+  }
+
   var esc = JSTStore.esc;
 
   function nonNegInt(v) {
@@ -390,6 +420,12 @@
 
   function renderNoticeForm() {
     var editing = state.noticeEditingId !== null;
+    var existingFiles = state.noticeFiles.length ? state.noticeFiles.map(function (file) {
+      return '<div style="display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:9px;background:#FFFFFF;border:1px solid #E6E8EC;">' +
+        '<span aria-hidden="true">📎</span><span style="flex:1;min-width:0;font-size:12.5px;font-weight:700;color:#14263F;overflow-wrap:anywhere;">' + esc(file.name) + '</span>' +
+        '<button type="button" data-action="remove-notice-file" data-file-id="' + esc(file.id) + '" style="padding:5px 8px;border-radius:7px;border:1px solid #F3D9D6;background:#FDF3F2;color:#E0483E;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">삭제</button></div>';
+    }).join('') : '';
+    var pendingFiles = state.noticePendingFiles.length ? '<div style="font-size:11.5px;color:#4B5563;line-height:1.7;">업로드 예정: ' + state.noticePendingFiles.map(function (file) { return esc(file.name); }).join(', ') + '</div>' : '';
     return '<div>' +
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:18px;flex-wrap:wrap;">' +
         '<div style="font-size:17px;font-weight:800;color:#14263F;">' + (editing ? '공지 수정' : '새 공지 작성') + '</div>' +
@@ -412,16 +448,14 @@
           '<input type="checkbox" data-input="notice-form-pinned"' + (state.noticeFormPinned ? ' checked' : '') + ' style="width:17px;height:17px;accent-color:#FF6A3D;" />' +
           '<span style="font-size:13px;font-weight:700;color:#14263F;">상단에 고정할게요</span>' +
         '</label>' +
-        '<div style="padding:14px;border:1.5px dashed #D8DCE3;border-radius:12px;background:#FAFAFB;">' +
-          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;flex-wrap:wrap;">' +
-            '<span style="font-size:12.5px;font-weight:700;color:#4B5563;">첨부파일</span>' +
-            '<span style="padding:3px 7px;border-radius:6px;background:#F0F1F3;color:#8A93A1;font-size:10.5px;font-weight:800;">서버 연동 후 활성화</span>' +
-          '</div>' +
-          '<input type="file" disabled aria-label="첨부파일" style="width:100%;font-size:12.5px;color:#C3C9D2;cursor:not-allowed;" />' +
+        '<div style="padding:14px;border:1.5px dashed #D8DCE3;border-radius:12px;background:#FAFAFB;display:flex;flex-direction:column;gap:9px;">' +
+          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span style="font-size:12.5px;font-weight:700;color:#4B5563;">첨부파일</span><span style="padding:3px 7px;border-radius:6px;background:#F0F1F3;color:#8A93A1;font-size:10.5px;font-weight:800;">PDF·JPG·PNG·WEBP · 최대 5개</span></div>' +
+          existingFiles + pendingFiles +
+          '<input type="file" data-input="notice-files" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp" aria-label="첨부파일" style="width:100%;font-size:12.5px;color:#4B5563;cursor:pointer;" />' +
         '</div>' +
         (state.noticeError ? '<div style="font-size:12.5px;color:#E0483E;font-weight:600;">' + esc(state.noticeError) + '</div>' : '') +
         '<div style="display:flex;gap:9px;">' +
-          '<button data-action="save-notice" style="flex:1;' + S.primaryBtn + '">' + (editing ? '수정 저장' : '등록') + '</button>' +
+          '<button data-action="save-notice"' + (state.saving ? ' disabled' : '') + ' style="flex:1;' + S.primaryBtn + 'opacity:' + (state.saving ? '.6' : '1') + ';cursor:' + (state.saving ? 'wait' : 'pointer') + ';">' + (state.saving ? '저장하고 있어요…' : (editing ? '수정 저장' : '등록')) + '</button>' +
           '<button data-action="cancel-notice-form" style="flex:1;padding:12px;border-radius:11px;border:1.5px solid #E6E8EC;background:#FFFFFF;color:#4B5563;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">취소</button>' +
         '</div>' +
       '</div>' +
@@ -516,6 +550,14 @@
     '<div id="inquiry-list-results">' + renderInquiryListResults() + '</div>';
   }
 
+  function renderAdminEstimate(estimate) {
+    if (!estimate) return '';
+    var lines = (estimate.lines || []).map(function (line) {
+      return '<div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid #F0F1F3;font-size:12.5px;"><span style="color:#374151;">' + esc(line.group) + ' · ' + esc(line.label) + ' ×' + esc(line.qty) + '</span><span style="flex:none;font-weight:700;color:#14263F;">' + esc(line.subtotal || '') + '</span></div>';
+    }).join('') || '<div style="font-size:12.5px;color:#8A93A1;">담긴 품목이 없어요.</div>';
+    return '<div><div style="font-size:12px;font-weight:700;color:#4B5563;margin-bottom:7px;">첨부 견적</div><div style="padding:14px 16px;border-radius:11px;background:#FFF9F5;border:1px solid #FFD9C4;"><div style="font-size:12.5px;font-weight:800;color:#14263F;margin-bottom:8px;">' + esc(estimate.tripInfo || '일정 미정') + '</div>' + lines + '<div style="display:flex;justify-content:space-between;gap:10px;padding-top:9px;font-size:13px;font-weight:800;color:#E85425;"><span>합계</span><span>' + esc(estimate.total || '-') + '</span></div></div></div>';
+  }
+
   function renderInquiryDetail() {
     var q = findInquiryById(state.selectedInquiryId);
     if (!q) {
@@ -538,6 +580,7 @@
         '<div><span style="display:block;font-size:11.5px;font-weight:700;color:#8A93A1;margin-bottom:4px;">연락처</span><span style="font-size:13.5px;font-weight:700;color:#14263F;overflow-wrap:anywhere;">' + esc(q.contact && q.contact.trim() ? q.contact : '-') + '</span></div>' +
         '<div><span style="display:block;font-size:11.5px;font-weight:700;color:#8A93A1;margin-bottom:4px;">이메일</span><span style="font-size:13.5px;font-weight:700;color:#14263F;overflow-wrap:anywhere;">' + esc(q.email && q.email.trim() ? q.email : '-') + '</span></div>' +
       '</div>' +
+      renderAdminEstimate(q.estimate) +
       '<div><div style="font-size:12px;font-weight:700;color:#4B5563;margin-bottom:7px;">문의 내용</div>' +
         '<div style="padding:14px 16px;border-radius:11px;background:#F5F6F8;font-size:13.5px;color:#374151;line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere;">' + esc(q.content && q.content.trim() ? q.content : '(등록된 문의 내용이 없어요)') + '</div></div>' +
       '<label style="display:flex;flex-direction:column;gap:7px;"><span style="font-size:12px;font-weight:700;color:#4B5563;">답변</span>' +
@@ -565,9 +608,29 @@
     state.noticeFormBody = '';
     state.noticeFormPinned = false;
     state.noticeError = '';
+    state.noticeFiles = [];
+    state.noticePendingFiles = [];
   }
 
   function renderAll() {
+    if (state.loading) {
+      document.getElementById('pageTitle').textContent = '관리자 화면을 준비하고 있어요';
+      document.getElementById('pageDesc').textContent = '서버에서 운영 데이터를 불러오는 중이에요.';
+      document.getElementById('adminSummary').innerHTML = '';
+      document.getElementById('tabBar').innerHTML = '';
+      document.getElementById('panel').innerHTML = '<div style="padding:44px 20px;text-align:center;color:#8A93A1;font-size:14px;">잠시만 기다려주세요.</div>';
+      document.getElementById('resetRow').style.display = 'none';
+      return;
+    }
+    if (state.loadError) {
+      document.getElementById('pageTitle').textContent = '관리자 데이터를 불러오지 못했어요';
+      document.getElementById('pageDesc').textContent = '서버 연결을 확인하고 다시 시도해주세요.';
+      document.getElementById('adminSummary').innerHTML = '';
+      document.getElementById('tabBar').innerHTML = '';
+      document.getElementById('panel').innerHTML = '<div style="padding:36px 20px;text-align:center;"><div style="color:#E0483E;font-size:13.5px;font-weight:700;margin-bottom:12px;">' + esc(state.loadError) + '</div><button data-action="retry-admin-load" style="padding:10px 16px;border-radius:10px;border:none;background:#14263F;color:#FFFFFF;font-weight:700;cursor:pointer;font-family:inherit;">다시 불러오기</button></div>';
+      document.getElementById('resetRow').style.display = 'none';
+      return;
+    }
     var meta = pageMeta();
     document.getElementById('pageTitle').textContent = meta.title;
     document.getElementById('pageDesc').textContent = meta.desc;
@@ -580,6 +643,9 @@
     else if (tab === 'notice') panel.innerHTML = renderNoticeTab();
     else if (tab === 'inquiry') panel.innerHTML = renderInquiryTab();
     else panel.innerHTML = renderCatalogTab();
+    if (state.operationError) {
+      panel.innerHTML = '<div role="alert" style="margin-bottom:14px;padding:11px 13px;border-radius:10px;background:#FDF3F2;color:#E0483E;font-size:12.5px;font-weight:700;line-height:1.5;">' + esc(state.operationError) + '</div>' + panel.innerHTML;
+    }
 
     document.getElementById('resetRow').style.display = CATALOG_TABS.indexOf(tab) !== -1 ? '' : 'none';
     document.getElementById('resetModal').style.display = state.showResetConfirm ? 'flex' : 'none';
@@ -608,11 +674,11 @@
     'toggle-enabled': function (el) {
       var s = el.dataset.section;
       state.discountConfig[s].enabled = !state.discountConfig[s].enabled;
-      persistDiscount(); renderAll();
+      persistDiscount(true); renderAll();
     },
     'set-disc-type': function (el) {
       state.discountConfig[el.dataset.section].type = el.dataset.type;
-      persistDiscount(); renderAll();
+      persistDiscount(true); renderAll();
     },
     'add-keyword': function () {
       var kw = (state.draftKeyword || '').trim();
@@ -620,22 +686,26 @@
       var exists = state.discountConfig.keywords.some(function (k) { return k.toLowerCase() === kw.toLowerCase(); });
       if (!exists) {
         state.discountConfig.keywords.push(kw);
-        persistDiscount();
+        persistDiscount(true);
       }
       state.draftKeyword = '';
       renderAll();
     },
     'remove-keyword': function (el) {
       state.discountConfig.keywords.splice(Number(el.dataset.idx), 1);
-      persistDiscount(); renderAll();
+      persistDiscount(true); renderAll();
     },
 
-    'remove-item': function (el) {
+    'remove-item': async function (el) {
       var cat = state.activeTab;
-      state.catalog[cat] = state.catalog[cat].filter(function (it) { return it.id !== el.dataset.id; });
-      persistCatalog(); renderAll();
+      clearTimeout(catalogSaveTimers[cat + ':' + el.dataset.id]);
+      try {
+        await JSTStore.deleteCatalogItem(cat, el.dataset.id);
+        state.catalog[cat] = state.catalog[cat].filter(function (it) { return it.id !== el.dataset.id; });
+        state.operationError = ''; showFlash(); renderAll();
+      } catch (error) { handleError(error); }
     },
-    'move-item': function (el) {
+    'move-item': async function (el) {
       var cat = state.activeTab;
       var items = state.catalog[cat] || [];
       var index = items.findIndex(function (it) { return it.id === el.dataset.id; });
@@ -645,35 +715,62 @@
       var moved = items[index];
       items[index] = items[target];
       items[target] = moved;
-      persistCatalog(); renderAll();
+      renderAll();
+      try {
+        state.catalog = await JSTStore.reorderCatalog(cat, items.map(function (item) { return item.id; }));
+        state.operationError = ''; showFlash(); renderAll();
+      } catch (error) {
+        items[target] = items[index];
+        items[index] = moved;
+        handleError(error);
+      }
     },
-    'toggle-item-hidden': function (el) {
+    'toggle-item-hidden': async function (el) {
       var cat = state.activeTab;
       var item = (state.catalog[cat] || []).find(function (it) { return it.id === el.dataset.id; });
       if (!item) return;
+      clearTimeout(catalogSaveTimers[cat + ':' + item.id]);
       item.hidden = !item.hidden;
-      persistCatalog(); renderAll();
+      renderAll();
+      try {
+        Object.assign(item, await JSTStore.updateCatalogItem(cat, item.id, item));
+        state.operationError = ''; showFlash();
+      } catch (error) { item.hidden = !item.hidden; handleError(error); }
     },
-    'add-item': function () {
+    'add-item': async function () {
       var cat = state.activeTab;
       var name = state.draftName.trim();
       var price = parseCatalogPrice(state.draftPrice);
       if (!name) { state.draftError = '이름을 입력해주세요'; renderAll(); return; }
       if (!String(state.draftPrice || '').replace(/[^0-9]/g, '')) { state.draftError = '올바른 가격을 입력해주세요'; renderAll(); return; }
-      state.catalog[cat].push({
+      var item = {
         id: cat + '_' + Date.now(),
         name: name, desc: state.draftDesc.trim(), price: price,
         discountGeneral: 0, discountAffiliate: 0, hidden: false,
-      });
-      state.draftName = ''; state.draftDesc = ''; state.draftPrice = ''; state.draftError = '';
-      persistCatalog(); renderAll();
+      };
+      try {
+        state.catalog[cat].push(await JSTStore.createCatalogItem(cat, item));
+        state.draftName = ''; state.draftDesc = ''; state.draftPrice = ''; state.draftError = '';
+        state.operationError = ''; showFlash(); renderAll();
+      } catch (error) { handleError(error); }
     },
     'request-reset': function () { state.showResetConfirm = true; renderAll(); },
     'cancel-reset': function () { state.showResetConfirm = false; renderAll(); },
-    'confirm-reset': function () {
-      state.catalog = JSTStore.defaultCatalog();
+    'confirm-reset': async function () {
       state.showResetConfirm = false;
-      persistCatalog(); renderAll();
+      renderAll();
+      try {
+        Object.keys(catalogSaveTimers).forEach(function (key) { clearTimeout(catalogSaveTimers[key]); });
+        var defaults = JSTStore.defaultCatalog();
+        for (var c = 0; c < CATALOG_TABS.length; c++) {
+          var resetCat = CATALOG_TABS[c];
+          var current = state.catalog[resetCat].slice();
+          for (var d = 0; d < current.length; d++) await JSTStore.deleteCatalogItem(resetCat, current[d].id);
+          for (var a = 0; a < defaults[resetCat].length; a++) await JSTStore.createCatalogItem(resetCat, defaults[resetCat][a]);
+        }
+        state.catalog = await JSTStore.loadAdminCatalog();
+        state.operationError = ''; showFlash(); renderAll();
+      } catch (error) { handleError(error, '기본 품목으로 되돌리지 못했어요. 다시 불러와 상태를 확인해주세요.'); }
     },
 
     'new-notice': function () {
@@ -689,6 +786,8 @@
       state.noticeFormTitle = notice.title || '';
       state.noticeFormBody = notice.body || '';
       state.noticeFormPinned = !!notice.pinned;
+      state.noticeFiles = (notice.files || []).slice();
+      state.noticePendingFiles = [];
       state.noticeError = '';
       state.noticeView = 'form';
       renderAll();
@@ -698,29 +797,54 @@
       state.noticeView = 'list';
       renderAll();
     },
-    'save-notice': function () {
+    'save-notice': async function () {
+      if (state.saving) return;
       var title = (state.noticeFormTitle || '').trim();
       var body = (state.noticeFormBody || '').trim();
       if (!title) { state.noticeError = '제목을 입력해주세요'; renderAll(); return; }
       if (!body) { state.noticeError = '내용을 입력해주세요'; renderAll(); return; }
-      if (state.noticeEditingId !== null) {
-        var editingNotice = findNoticeById(state.noticeEditingId);
-        if (!editingNotice) { clearNoticeForm(); state.noticeView = 'list'; renderAll(); return; }
-        editingNotice.tag = (state.noticeFormTag || '').trim();
-        editingNotice.title = title;
-        editingNotice.body = body;
-        editingNotice.pinned = !!state.noticeFormPinned;
-      } else {
-        state.notices.unshift({
-          id: Date.now(), tag: (state.noticeFormTag || '').trim(), title: title,
-          date: todayDateStr(), body: body, pinned: !!state.noticeFormPinned,
-        });
+      if (state.noticeFiles.length + state.noticePendingFiles.length > 5) {
+        state.noticeError = '첨부파일은 최대 5개까지 등록할 수 있어요'; renderAll(); return;
+      }
+      state.saving = true;
+      state.noticeError = '';
+      renderAll();
+      try {
+        var payload = {
+          tag: (state.noticeFormTag || '').trim(), title: title, body: body,
+          pinned: !!state.noticeFormPinned,
+        };
+        var saved;
+        if (state.noticeEditingId !== null) saved = await JSTStore.updateNotice(state.noticeEditingId, payload);
+        else saved = await JSTStore.createNotice(payload);
+        state.noticeEditingId = saved.id;
+        state.noticeFiles = (saved.files || []).slice();
+        var savedIndex = state.notices.findIndex(function (notice) { return String(notice.id) === String(saved.id); });
+        if (savedIndex >= 0) state.notices[savedIndex] = saved;
+        else state.notices.unshift(saved);
+        while (state.noticePendingFiles.length) {
+          var uploaded = await JSTStore.uploadNoticeFile(saved.id, state.noticePendingFiles[0]);
+          state.noticeFiles.push(uploaded);
+          state.noticePendingFiles.shift();
+          saved.files = state.noticeFiles.slice();
+          state.notices[savedIndex] = saved;
+        }
+        saved.files = state.noticeFiles.slice();
+        savedIndex = state.notices.findIndex(function (notice) { return String(notice.id) === String(saved.id); });
+        state.notices[savedIndex] = saved;
         state.noticeSearch = '';
         state.noticePage = 1;
+        state.operationError = '';
+        clearNoticeForm();
+        state.noticeView = 'list';
+        showFlash();
+      } catch (error) {
+        if (error.status === 401) handleError(error);
+        else state.noticeError = error.message || '공지를 저장하지 못했어요.';
+      } finally {
+        state.saving = false;
+        renderAll();
       }
-      clearNoticeForm();
-      state.noticeView = 'list';
-      persistNotices(); renderAll();
     },
     'notice-page': function (el) {
       state.noticePage = Math.max(1, Number(el.dataset.page) || 1);
@@ -734,11 +858,25 @@
       state.noticeDeleteId = null;
       renderAll();
     },
-    'confirm-remove-notice': function () {
+    'confirm-remove-notice': async function () {
       var deleteId = state.noticeDeleteId;
-      state.notices = state.notices.filter(function (n) { return String(n.id) !== String(deleteId); });
       state.noticeDeleteId = null;
-      persistNotices(); renderAll();
+      renderAll();
+      try {
+        await JSTStore.deleteNotice(deleteId);
+        state.notices = state.notices.filter(function (n) { return String(n.id) !== String(deleteId); });
+        state.operationError = ''; showFlash(); renderAll();
+      } catch (error) { handleError(error); }
+    },
+    'remove-notice-file': async function (el) {
+      if (state.noticeEditingId === null) return;
+      try {
+        await JSTStore.deleteNoticeFile(state.noticeEditingId, el.dataset.fileId);
+        state.noticeFiles = state.noticeFiles.filter(function (file) { return String(file.id) !== String(el.dataset.fileId); });
+        var notice = findNoticeById(state.noticeEditingId);
+        if (notice) notice.files = state.noticeFiles.slice();
+        state.operationError = ''; showFlash(); renderAll();
+      } catch (error) { handleError(error); }
     },
 
     'set-inquiry-filter': function (el) {
@@ -762,29 +900,35 @@
       state.selectedInquiryId = null;
       renderAll();
     },
-    'save-answer': function (el) {
+    'save-answer': async function (el) {
       var id = String(el.dataset.id);
       var q = findInquiryById(id);
       if (!q) return;
       var draft = (state.answerDrafts[id] !== undefined ? state.answerDrafts[id] : (q.answer || '')).trim();
-      q.answer = draft;
-      q.status = draft ? '답변완료' : '답변대기';
-      state.answerDrafts[id] = draft;
-      persistInquiries(); renderAll();
+      try {
+        var updated = await JSTStore.updateInquiry(id, { answer: draft, status: draft ? '답변완료' : '답변대기' });
+        Object.assign(q, updated);
+        state.answerDrafts[id] = draft;
+        state.operationError = ''; showFlash(); renderAll();
+      } catch (error) { handleError(error); }
     },
-    'remove-inquiry': function (el) {
+    'remove-inquiry': async function (el) {
       var id = String(el.dataset.id);
-      state.inquiries = state.inquiries.filter(function (x) { return String(x.id) !== id; });
-      delete state.answerDrafts[id];
-      state.inquiryView = 'list';
-      state.selectedInquiryId = null;
-      persistInquiries(); renderAll();
+      try {
+        await JSTStore.deleteInquiry(id);
+        state.inquiries = state.inquiries.filter(function (x) { return String(x.id) !== id; });
+        delete state.answerDrafts[id];
+        state.inquiryView = 'list';
+        state.selectedInquiryId = null;
+        state.operationError = ''; showFlash(); renderAll();
+      } catch (error) { handleError(error); }
     },
+    'retry-admin-load': async function () { await init(); },
   };
 
-  document.addEventListener('click', function (e) {
+  document.addEventListener('click', async function (e) {
     var el = e.target.closest('[data-action]');
-    if (el && actions[el.dataset.action]) actions[el.dataset.action](el);
+    if (el && actions[el.dataset.action]) await actions[el.dataset.action](el);
   });
 
   // 입력은 리렌더 없이 상태만 갱신해 포커스를 유지한다.
@@ -805,12 +949,12 @@
       }
       else if (field === 'discountGeneral' || field === 'discountAffiliate') it[field] = nonNegFloat(v);
       else it[field] = v;
-      persistCatalog();
+      queueCatalogSave(cat, it);
     } else if (kind === 'fixed-item-discount') {
       var discountItem = (state.catalog[el.dataset.cat] || []).find(function (x) { return x.id === el.dataset.id; });
       if (!discountItem) return;
       discountItem[el.dataset.field] = nonNegFloat(v);
-      persistCatalog();
+      queueCatalogSave(el.dataset.cat, discountItem);
     } else if (kind === 'disc-value') {
       var section = el.dataset.section;
       state.discountConfig[section].value = nonNegFloat(v);
@@ -838,12 +982,51 @@
     else if (kind === 'notice-form-title') { state.noticeFormTitle = v; state.noticeError = ''; }
     else if (kind === 'notice-form-body') { state.noticeFormBody = v; state.noticeError = ''; }
     else if (kind === 'notice-form-pinned') { state.noticeFormPinned = el.checked; }
+    else if (kind === 'notice-files') {
+      var selectedFiles = Array.from(el.files || []);
+      if (state.noticeFiles.length + selectedFiles.length > 5) {
+        state.noticeError = '기존 첨부를 포함해 최대 5개까지 선택할 수 있어요';
+        state.noticePendingFiles = [];
+      } else {
+        state.noticePendingFiles = selectedFiles;
+        state.noticeError = '';
+      }
+      renderAll();
+    }
   });
 
-  document.getElementById('logoutBtn').addEventListener('click', function () {
-    JSTStore.clearAdminSession();
+  document.getElementById('logoutBtn').addEventListener('click', async function () {
+    try { await JSTStore.logoutAdmin(); } catch (error) {}
     window.location.href = 'admin-login.html';
   });
 
+  async function init() {
+    state.loading = true;
+    state.loadError = '';
+    renderAll();
+    try {
+      await JSTStore.getAdminSession();
+      var results = await Promise.all([
+        JSTStore.loadAdminCatalog(), JSTStore.loadAdminDiscountConfig(),
+        JSTStore.loadAdminNotices(), JSTStore.loadAdminInquiries(),
+      ]);
+      state.catalog = results[0];
+      state.discountConfig = results[1];
+      state.notices = results[2];
+      state.inquiries = results[3];
+      state.operationError = '';
+    } catch (error) {
+      if (error.status === 401) {
+        window.location.replace('admin-login.html?expired=1');
+        return;
+      }
+      state.loadError = error.message || '관리자 데이터를 불러오지 못했어요.';
+    } finally {
+      state.loading = false;
+      renderAll();
+    }
+  }
+
   renderAll();
+  init();
 })();

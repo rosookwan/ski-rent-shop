@@ -5,6 +5,7 @@
 
   // ── 일정·인원 플래너 ────────────────────────────────────────
   var state = { undecided: false, start: '', end: '', adult: 2, child: 0 };
+  var previewState = { notices: [], inquiries: [], loading: true, error: '' };
 
   var S = {
     pillOn: 'flex:none;padding:7px 13px;border-radius:999px;background:#14263F;color:#FFFFFF;font-weight:700;font-size:12.5px;border:none;cursor:pointer;white-space:nowrap;font-family:inherit;',
@@ -100,7 +101,18 @@
   }
 
   function renderPreviews() {
-    var notices = JST.loadNotices().slice(0, 3);
+    if (previewState.loading) {
+      document.getElementById('noticePreview').innerHTML = '<div style="font-size:13px;color:#8A93A1;padding:8px 0;">공지사항을 불러오고 있어요.</div>';
+      document.getElementById('inquiryPreview').innerHTML = '<div style="font-size:13px;color:#8A93A1;padding:8px 0;">문의 내역을 불러오고 있어요.</div>';
+      return;
+    }
+    if (previewState.error) {
+      var errorHtml = '<div style="font-size:13px;color:#E0483E;padding:8px 0;line-height:1.6;">' + JST.esc(previewState.error) + '<br><button data-action="retry-previews" style="margin-top:7px;padding:6px 10px;border-radius:8px;border:1px solid #E6E8EC;background:#FFFFFF;color:#14263F;font-weight:700;cursor:pointer;font-family:inherit;">다시 불러오기</button></div>';
+      document.getElementById('noticePreview').innerHTML = errorHtml;
+      document.getElementById('inquiryPreview').innerHTML = errorHtml;
+      return;
+    }
+    var notices = previewState.notices.slice(0, 3);
     document.getElementById('noticePreview').innerHTML = notices.map(function (n, i) {
       return '<a href="notice.html?id=' + encodeURIComponent(n.id) + '" style="' + rowStyle(i === notices.length - 1) + '">' +
         (n.tag ? '<span style="flex:none;padding:3px 8px;border-radius:6px;background:#FFF3EC;color:#FF6A3D;font-size:11px;font-weight:800;">' + JST.esc(n.tag) + '</span>' : '') +
@@ -109,7 +121,7 @@
       '</a>';
     }).join('') || '<div style="font-size:13px;color:#8A93A1;padding:8px 0;">등록된 공지사항이 없어요.</div>';
 
-    var inquiries = JST.loadInquiries().slice(0, 3);
+    var inquiries = previewState.inquiries.slice(0, 3);
     document.getElementById('inquiryPreview').innerHTML = inquiries.map(function (q, i) {
       var done = q.status === '답변완료';
       var shortDate = (q.date || '').length > 5 ? q.date.slice(5) : q.date;
@@ -121,10 +133,27 @@
     }).join('') || '<div style="font-size:13px;color:#8A93A1;padding:8px 0;">등록된 문의가 없어요.</div>';
   }
 
-  window.addEventListener('storage', function (e) {
-    if (!e || e.key === JST.KEYS.notices || e.key === JST.KEYS.inquiries) renderPreviews();
+  async function refreshPreviews() {
+    previewState.loading = true;
+    previewState.error = '';
+    renderPreviews();
+    try {
+      var results = await Promise.all([JST.loadNotices(), JST.loadInquiries()]);
+      previewState.notices = results[0];
+      previewState.inquiries = results[1];
+    } catch (error) {
+      previewState.error = error.message || '게시판 내용을 불러오지 못했어요.';
+    } finally {
+      previewState.loading = false;
+      renderPreviews();
+    }
+  }
+
+  document.addEventListener('click', function (e) {
+    var retry = e.target.closest('[data-action="retry-previews"]');
+    if (retry) refreshPreviews();
   });
 
   renderPlanner();
-  renderPreviews();
+  refreshPreviews();
 })();

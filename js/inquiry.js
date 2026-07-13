@@ -17,9 +17,10 @@
   var state = Object.assign({
     activeTab: 'list', selectedId: null, page: 1,
     viewPassword: '', viewPasswordError: '', unlockedInquiryIds: {},
-    discountConfig: JST.loadDiscountConfig(),
-    catalog: JST.loadCatalog(),
-    inquiries: JST.loadInquiries(),
+    discountConfig: JST.defaultDiscountConfig(),
+    catalog: JST.defaultCatalog(),
+    inquiries: [], loading: true, loadError: '', detailLoading: false,
+    submitting: false,
   }, defaultFormState());
 
   // URL 파라미터 처리 (?mode=write / ?from=estimate / ?id=N)
@@ -72,40 +73,58 @@
     return 'none';
   }
 
-  function submit() {
+  function estimatePayload(est) {
+    if (!est) return null;
+    return {
+      tripInfo: est.tripInfo || '',
+      affiliateType: est.affiliateType || 'none',
+      affiliateName: est.affiliateName || '',
+      lines: (est.lines || []).map(function (line) {
+        return {
+          group: line.group, label: line.label, qty: line.qty,
+          subtotal: line.subtotal || '', subtotalValue: line.subtotalValue,
+          cat: line.cat, itemId: line.itemId,
+        };
+      }),
+      total: est.total || '', totalValue: est.totalValue,
+      email: est.email || '', createdAt: est.createdAt || '',
+    };
+  }
+
+  async function submit() {
+    if (state.submitting) return;
     if (!state.name.trim()) { state.formError = '이름을 입력해주세요'; render(); return; }
     if (!state.title.trim()) { state.formError = '제목을 입력해주세요'; render(); return; }
     if (!state.fromEstimate && !state.content.trim()) { state.formError = '내용을 입력해주세요'; render(); return; }
     if (state.secretChecked && !state.password.trim()) { state.formError = '비밀글 비밀번호를 입력해주세요'; render(); return; }
-    var est = state.attachedEstimate;
-    var content = state.content.trim();
-    if (state.fromEstimate && est) {
-      var lines = (est.lines || []).map(function (l) {
-        return l.group + ' · ' + l.label + ' ×' + l.qty + ' (' + l.subtotal + ')';
-      }).join('\n');
-      content = '[셀프견적 첨부]\n' + est.tripInfo + '\n' + lines + '\n합계: ' + est.total + (content ? ('\n\n' + content) : '');
-    }
-    var record = {
-      id: Date.now(),
-      title: state.title.trim(),
-      date: JST.todayDateStr(),
-      status: '답변대기',
-      secret: state.secretChecked,
-      password: state.secretChecked ? state.password.trim() : '',
-      name: state.name.trim(),
-      contact: state.contact.trim(),
-      email: state.email.trim(),
-      content: content,
-      answer: '',
-    };
-    state.inquiries = [record].concat(state.inquiries);
-    JST.saveInquiries(state.inquiries);
-    if (state.fromEstimate) JST.clearEstimateDraft();
-    state.page = 1;
-    state.submitted = true;
+    if (state.secretChecked && state.password.trim().length < 4) { state.formError = '비밀글 비밀번호는 4자 이상 입력해주세요'; render(); return; }
+    state.submitting = true;
     state.formError = '';
     render();
-    window.scrollTo(0, 0);
+    try {
+      var created = await JST.createInquiry({
+        name: state.name.trim(), contact: state.contact.trim(), email: state.email.trim(),
+        title: state.title.trim(), content: state.content.trim(), secret: state.secretChecked,
+        password: state.secretChecked ? state.password.trim() : '',
+        estimate: state.fromEstimate ? estimatePayload(state.attachedEstimate) : null,
+      });
+      state.inquiries.unshift({
+        id: created.id, title: state.title.trim(), date: created.date,
+        status: created.status, secret: state.secretChecked, name: maskName(state.name),
+      });
+      if (state.fromEstimate) {
+        JST.clearEstimateDraft();
+        JST.clearEstimate();
+      }
+      state.page = 1;
+      state.submitted = true;
+      window.scrollTo(0, 0);
+    } catch (error) {
+      state.formError = error.status === 422 ? '입력 내용을 다시 확인해주세요.' : (error.message || '문의를 등록하지 못했어요.');
+    } finally {
+      state.submitting = false;
+      render();
+    }
   }
 
   // ── 렌더링 ──────────────────────────────────────────────────
@@ -117,6 +136,36 @@
 
   function findInquiryById(id) {
     return state.inquiries.find(function (q) { return String(q.id) === String(id); });
+  }
+
+  function replaceInquiry(detail) {
+    var index = state.inquiries.findIndex(function (item) { return String(item.id) === String(detail.id); });
+    if (index >= 0) state.inquiries[index] = detail;
+    else state.inquiries.unshift(detail);
+  }
+
+  async function openInquiry(id) {
+    var inquiry = findInquiryById(id);
+    if (!inquiry) return;
+    state.selectedId = inquiry.id;
+    state.viewPassword = '';
+    state.viewPasswordError = '';
+    if (inquiry.secret) {
+      render();
+      window.scrollTo(0, 0);
+      return;
+    }
+    state.detailLoading = true;
+    render();
+    try {
+      replaceInquiry(await JST.getInquiry(inquiry.id));
+    } catch (error) {
+      state.loadError = error.message || '문의 내용을 불러오지 못했어요.';
+    } finally {
+      state.detailLoading = false;
+      render();
+      window.scrollTo(0, 0);
+    }
   }
 
   function maskName(name) {
@@ -358,17 +407,26 @@
           '</div>'
         : '') +
       (state.formError ? '<div style="font-size:12.5px;color:#E0483E;">' + esc(state.formError) + '</div>' : '') +
-      '<button data-action="submit" style="margin-top:4px;padding:15px;border-radius:13px;background:#FF6A3D;color:#FFFFFF;font-weight:800;font-size:15px;border:none;cursor:pointer;font-family:inherit;">문의 등록하기</button>' +
+      '<button data-action="submit"' + (state.submitting ? ' disabled' : '') + ' style="margin-top:4px;padding:15px;border-radius:13px;background:#FF6A3D;color:#FFFFFF;font-weight:800;font-size:15px;border:none;cursor:' + (state.submitting ? 'wait' : 'pointer') + ';opacity:' + (state.submitting ? '.65' : '1') + ';font-family:inherit;">' + (state.submitting ? '등록하고 있어요…' : '문의 등록하기') + '</button>' +
     '</div>';
     return html;
   }
 
   function render() {
     var app = document.getElementById('app');
+    if (state.loading) {
+      app.innerHTML = '<div style="padding:48px 20px;text-align:center;color:#8A93A1;font-size:14px;">문의 내역을 불러오고 있어요.</div>';
+      return;
+    }
+    if (state.loadError) {
+      app.innerHTML = '<div style="padding:40px 20px;text-align:center;border:1px solid #E6E8EC;border-radius:18px;background:#FFFFFF;"><div style="color:#E0483E;font-size:14px;font-weight:700;margin-bottom:12px;">' + esc(state.loadError) + '</div><button data-action="retry-load" style="padding:10px 16px;border-radius:10px;border:none;background:#14263F;color:#FFFFFF;font-weight:700;cursor:pointer;font-family:inherit;">다시 불러오기</button></div>';
+      return;
+    }
     var html = renderTabs();
     var selected = state.selectedId !== null ? findInquiryById(state.selectedId) : null;
     var unlocked = selected && state.unlockedInquiryIds[String(selected.id)];
-    if (selected && selected.secret && !unlocked) html += renderPasswordPrompt();
+    if (state.detailLoading) html += '<div style="padding:40px 20px;text-align:center;color:#8A93A1;font-size:14px;">문의 내용을 불러오고 있어요.</div>';
+    else if (selected && selected.secret && !unlocked) html += renderPasswordPrompt();
     else if (state.selectedId !== null) html += renderDetail();
     else if (state.activeTab === 'write') html += renderWrite();
     else html += renderList();
@@ -378,35 +436,44 @@
   var actions = {
     'set-tab-list': function () { state.activeTab = 'list'; state.selectedId = null; state.viewPassword = ''; state.viewPasswordError = ''; render(); },
     'set-tab-write': function () { state.activeTab = 'write'; render(); },
-    'open': function (el) {
+    'open': async function (el) {
       var v = Number(el.dataset.id);
-      state.selectedId = isNaN(v) ? el.dataset.id : v;
-      state.viewPassword = '';
-      state.viewPasswordError = '';
-      render(); window.scrollTo(0, 0);
+      await openInquiry(isNaN(v) ? el.dataset.id : v);
     },
     'back': function () { state.selectedId = null; state.viewPassword = ''; state.viewPasswordError = ''; render(); },
-    'verify-password': function () {
-      if (JST.verifyInquiryPassword(state.selectedId, state.viewPassword.trim())) {
+    'verify-password': async function () {
+      if (!state.viewPassword.trim()) {
+        state.viewPasswordError = '비밀번호를 입력해주세요';
+        render();
+        return;
+      }
+      state.detailLoading = true;
+      render();
+      try {
+        var detail = await JST.verifyInquiryPassword(state.selectedId, state.viewPassword.trim());
+        replaceInquiry(detail);
         state.unlockedInquiryIds[String(state.selectedId)] = true;
         state.viewPassword = '';
         state.viewPasswordError = '';
-      } else {
-        state.viewPasswordError = '비밀번호가 일치하지 않아요';
+      } catch (error) {
+        state.viewPasswordError = error.status === 403 ? '비밀번호가 일치하지 않아요' : (error.message || '확인하지 못했어요.');
+      } finally {
+        state.detailLoading = false;
+        render();
       }
-      render();
     },
     'inquiry-page': function (el) { state.page = Math.max(1, Number(el.dataset.page) || 1); render(); window.scrollTo(0, 0); },
-    'submit': function () { submit(); },
+    'submit': async function () { await submit(); },
+    'retry-load': async function () { await init(); },
     'back-from-submit': function () {
       Object.assign(state, defaultFormState(), { activeTab: 'list', selectedId: null, page: 1 });
       render();
     },
   };
 
-  document.getElementById('app').addEventListener('click', function (e) {
+  document.getElementById('app').addEventListener('click', async function (e) {
     var el = e.target.closest('[data-action]');
-    if (el && actions[el.dataset.action]) actions[el.dataset.action](el);
+    if (el && actions[el.dataset.action]) await actions[el.dataset.action](el);
   });
 
   document.getElementById('app').addEventListener('input', function (e) {
@@ -429,11 +496,26 @@
     render();
   });
 
-  window.addEventListener('storage', function (e) {
-    if (!e || e.key === JST.KEYS.inquiries) { state.inquiries = JST.loadInquiries(); render(); }
-    if (!e || e.key === JST.KEYS.discount) { state.discountConfig = JST.loadDiscountConfig(); render(); }
-    if (!e || e.key === JST.KEYS.catalog) { state.catalog = JST.loadCatalog(); render(); }
-  });
+  async function init() {
+    state.loading = true;
+    state.loadError = '';
+    render();
+    try {
+      var results = await Promise.all([JST.loadInquiries(), JST.loadDiscountConfig(), JST.loadCatalog()]);
+      state.inquiries = results[0];
+      state.discountConfig = results[1];
+      state.catalog = results[2];
+      if (state.selectedId !== null) {
+        var selected = findInquiryById(state.selectedId);
+        if (selected && !selected.secret) replaceInquiry(await JST.getInquiry(selected.id));
+      }
+    } catch (error) {
+      state.loadError = error.message || '문의 내역을 불러오지 못했어요.';
+    } finally {
+      state.loading = false;
+      render();
+    }
+  }
 
-  render();
+  init();
 })();

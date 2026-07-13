@@ -1,42 +1,23 @@
 /**
- * 데이터 계층 (Data Access Layer)
- *
- * 모든 페이지의 데이터 저장/조회는 반드시 이 모듈(JSTStore)을 통해서만 한다.
- * localStorage를 직접 만지는 코드를 다른 파일에 추가하지 말 것.
- *
- * ▶ M3(백엔드 이관) 시나리오: 이 파일의 내부 구현(localStorage)을 API 호출로
- *   교체하면 나머지 코드는 수정 없이 동작하는 것이 목표다.
- *   (그 시점에 load·save 함수는 async로 바뀌고 호출부 조정이 필요하다 —
- *    docs/architecture.md의 "M3 전환 계획" 참고)
- *
- * 데이터 스키마는 docs/architecture.md 참고.
+ * 데이터 계층. 서버 공유 데이터는 API, 페이지 간 임시 전달 데이터만 localStorage를 사용한다.
  */
 window.JSTStore = (function () {
   'use strict';
 
   var KEYS = {
-    catalog: 'jst_catalog',
-    discount: 'jst_discount_config',
-    notices: 'jst_notices',
-    inquiries: 'jst_inquiries',
     estimate: 'jst_estimate',
     estimateDraft: 'jst_estimate_draft',
     tripInfo: 'jst_trip_info',
-    adminSession: 'jst_admin_session',
   };
 
-  // ── 공통 유틸 ───────────────────────────────────────────────
-  /** HTML 이스케이프. 사용자 입력을 innerHTML에 넣을 때 반드시 사용. */
   function esc(v) {
     return String(v == null ? '' : v)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  /** 원화 표기: 55000 → "55,000원" */
   function won(n) { return Math.round(n).toLocaleString('ko-KR') + '원'; }
 
-  /** 오늘 날짜 "YYYY.MM.DD" */
   function todayDateStr() {
     var d = new Date();
     return d.getFullYear() + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0');
@@ -61,7 +42,6 @@ window.JSTStore = (function () {
     try { localStorage.removeItem(key); } catch (e) {}
   }
 
-  // ── 기본(시드) 데이터 ───────────────────────────────────────
   function defaultCatalog() {
     return {
       lift: [
@@ -108,58 +88,141 @@ window.JSTStore = (function () {
     };
   }
 
-  function defaultNotices() {
-    return [
-      { id: 1, tag: '공지', title: '2025-26 시즌 운영 안내', date: '2026.11.20', body: '2025-26 시즌 운영 일정과 이용 안내입니다. 방문 전 참고해주세요.' },
-      { id: 2, tag: '', title: '리프트권 가격 변경 안내', date: '2026.11.05', body: '리프트권 가격이 일부 변경되었습니다. 자세한 내용은 셀프견적 화면에서 확인해주세요.' },
-      { id: 3, tag: '', title: '주말 렌탈 예약 마감 임박 안내', date: '2026.10.28', body: '주말 렌탈 물량이 한정되어 있어 미리 예약해주시면 좋아요.' },
-      { id: 4, tag: '', title: '설 연휴 운영시간 안내', date: '2026.10.12', body: '설 연휴 기간 운영시간이 일부 조정됩니다.' },
-      { id: 5, tag: '', title: '장비 소독·점검 안내', date: '2026.09.30', body: '모든 렌탈 장비는 이용 전후로 소독과 점검을 진행하고 있습니다.' },
-      { id: 6, tag: '', title: '제휴 숙소 추가 안내', date: '2026.09.15', body: '제휴 숙소가 추가되었습니다. 숙박안내에서 확인해보세요.' },
-      { id: 7, tag: '', title: '시즌권 사전예약 안내', date: '2026.09.01', body: '시즌권 사전예약을 받고 있습니다. 문의게시판으로 남겨주세요.' },
-      { id: 8, tag: '', title: '홈페이지 리뉴얼 안내', date: '2026.08.20', body: '셀프견적을 포함해 홈페이지가 새로워졌습니다.' },
-    ];
+  function ApiError(message, status, details) {
+    this.name = 'ApiError';
+    this.message = message;
+    this.status = status || 0;
+    this.details = details || null;
+  }
+  ApiError.prototype = Object.create(Error.prototype);
+  ApiError.prototype.constructor = ApiError;
+
+  function apiUrl(path) {
+    if (/^https?:\/\//i.test(path)) return path;
+    var normalized = path.charAt(0) === '/' ? path : '/' + path;
+    return (window.JSTConfig ? window.JSTConfig.API_BASE : '') + normalized;
   }
 
-  function defaultInquiries() {
-    return [
-      { id: 1, title: '숙박 문의드립니다', date: '2026.07.10', status: '답변완료', secret: false, name: '', contact: '', email: '', content: '무주리조트 근처에서 2박 묵을 숙소를 찾고 있어요. 4인 가족 기준으로 추천 부탁드려요.', answer: '안녕하세요, 문의주셔서 감사합니다. 원하시는 일정에 맞는 숙소를 안내해드렸어요.' },
-      { id: 2, title: '렌탈 사이즈 관련 문의', date: '2026.07.09', status: '답변대기', secret: true, password: '1234', name: '', contact: '', email: '', content: '', answer: '' },
-      { id: 3, title: '리프트권 단체 할인 문의', date: '2026.07.06', status: '답변완료', secret: false, name: '', contact: '', email: '', content: '20명 단체로 방문 예정인데 리프트권 할인이 가능한가요?', answer: '단체 인원 기준 할인 안내를 답변드렸습니다.' },
-      { id: 4, title: '주차 가능 여부 문의', date: '2026.07.02', status: '답변완료', secret: false, name: '', contact: '', email: '', content: '방문객 주차 공간이 따로 있는지 궁금합니다.', answer: '네, 방문객 전용 주차공간이 마련되어 있습니다.' },
-      { id: 5, title: '초보자 강습 문의', date: '2026.06.28', status: '답변대기', secret: false, name: '', contact: '', email: '', content: '스키가 처음인데 강습 프로그램이 있을까요?', answer: '' },
-      { id: 6, title: '예약 변경 문의', date: '2026.06.25', status: '답변완료', secret: true, password: '1234', name: '', contact: '', email: '', content: '', answer: '예약 변경 처리해드렸습니다.' },
-    ];
+  function responseMessage(payload, fallback) {
+    if (payload && typeof payload.detail === 'string') return payload.detail;
+    return fallback;
   }
 
-  // ── 엔티티별 조회/저장 ──────────────────────────────────────
-  function loadCatalog() {
-    return loadRaw(KEYS.catalog, defaultCatalog(), function (p) {
-      return p && p.lift && p.equipment && p.clothing && p.safety;
+  async function request(path, options) {
+    var opts = Object.assign({ method: 'GET', credentials: 'include', cache: 'no-store' }, options || {});
+    opts.headers = Object.assign({ Accept: 'application/json' }, opts.headers || {});
+    if (Object.prototype.hasOwnProperty.call(opts, 'json')) {
+      opts.body = JSON.stringify(opts.json);
+      opts.headers['Content-Type'] = 'application/json';
+      delete opts.json;
+    }
+    var response;
+    try {
+      response = await fetch(apiUrl(path), opts);
+    } catch (error) {
+      throw new ApiError('서버에 연결할 수 없어요. 잠시 후 다시 시도해주세요.', 0, error);
+    }
+    if (response.status === 204) return null;
+    var payload = null;
+    var contentType = response.headers.get('content-type') || '';
+    try {
+      payload = contentType.indexOf('application/json') !== -1 ? await response.json() : await response.text();
+    } catch (e) {}
+    if (!response.ok) {
+      throw new ApiError(responseMessage(payload, '요청을 처리하지 못했어요. 잠시 후 다시 시도해주세요.'), response.status, payload);
+    }
+    return payload;
+  }
+
+  function queryString(params) {
+    var query = new URLSearchParams();
+    Object.keys(params || {}).forEach(function (key) {
+      var value = params[key];
+      if (value !== undefined && value !== null && value !== '') query.set(key, value);
+    });
+    var encoded = query.toString();
+    return encoded ? '?' + encoded : '';
+  }
+
+  async function loadCatalog() { return request('/api/catalog'); }
+  async function loadDiscountConfig() { return mergeDiscountConfig(await request('/api/discounts')); }
+  async function loadNotices() {
+    var result = await request('/api/notices?page=1&pageSize=100');
+    return result.items;
+  }
+  async function getNotice(id) { return request('/api/notices/' + encodeURIComponent(id)); }
+  async function loadInquiries() {
+    var result = await request('/api/inquiries?page=1&pageSize=100');
+    return result.items;
+  }
+  async function getInquiry(id) { return request('/api/inquiries/' + encodeURIComponent(id)); }
+  async function verifyInquiryPassword(id, password) {
+    return request('/api/inquiries/' + encodeURIComponent(id) + '/verify', {
+      method: 'POST', json: { password: password },
     });
   }
-  function saveCatalog(catalog) { saveRaw(KEYS.catalog, catalog); }
-
-  function loadDiscountConfig() { return mergeDiscountConfig(loadRaw(KEYS.discount, null)); }
-  function saveDiscountConfig(config) { saveRaw(KEYS.discount, config); }
-
-  function loadNotices() { return loadRaw(KEYS.notices, defaultNotices(), Array.isArray); }
-  function saveNotices(notices) { saveRaw(KEYS.notices, notices); }
-
-  function loadInquiries() { return loadRaw(KEYS.inquiries, defaultInquiries(), Array.isArray); }
-  function saveInquiries(inquiries) { saveRaw(KEYS.inquiries, inquiries); }
-  function verifyInquiryPassword(id, password) {
-    var provided = String(password || '');
-    if (!provided) return false;
-    var inquiry = loadInquiries().find(function (item) { return String(item.id) === String(id); });
-    return !!inquiry && !!inquiry.secret && String(inquiry.password || '') === provided;
+  async function createInquiry(payload) {
+    return request('/api/inquiries', { method: 'POST', json: payload });
   }
 
-  /** 셀프견적 → 문의게시판 전달 페이로드 */
+  async function loginAdmin(loginId, password) {
+    return request('/api/admin/auth/login', { method: 'POST', json: { loginId: loginId, password: password } });
+  }
+  async function logoutAdmin() { return request('/api/admin/auth/logout', { method: 'POST' }); }
+  async function getAdminSession() { return request('/api/admin/auth/session'); }
+
+  async function loadAdminCatalog() { return request('/api/admin/catalog'); }
+  async function loadAdminDiscountConfig() { return mergeDiscountConfig(await request('/api/admin/discounts')); }
+  async function loadAdminNotices() {
+    var result = await request('/api/admin/notices?page=1&pageSize=100');
+    return result.items;
+  }
+  async function loadAdminInquiries() {
+    var result = await request('/api/admin/inquiries?page=1&pageSize=100');
+    return result.items;
+  }
+  async function createNotice(payload) { return request('/api/admin/notices', { method: 'POST', json: payload }); }
+  async function updateNotice(id, payload) {
+    return request('/api/admin/notices/' + encodeURIComponent(id), { method: 'PUT', json: payload });
+  }
+  async function deleteNotice(id) {
+    return request('/api/admin/notices/' + encodeURIComponent(id), { method: 'DELETE' });
+  }
+  async function uploadNoticeFile(id, file) {
+    var form = new FormData();
+    form.append('file', file, file.name);
+    return request('/api/admin/notices/' + encodeURIComponent(id) + '/files', { method: 'POST', body: form });
+  }
+  async function deleteNoticeFile(noticeId, fileId) {
+    return request('/api/admin/notices/' + encodeURIComponent(noticeId) + '/files/' + encodeURIComponent(fileId), { method: 'DELETE' });
+  }
+  async function saveDiscountConfig(config) {
+    return request('/api/admin/discounts', { method: 'PUT', json: config });
+  }
+  async function createCatalogItem(category, item) {
+    return request('/api/admin/catalog/' + encodeURIComponent(category), { method: 'POST', json: item });
+  }
+  async function updateCatalogItem(category, id, item) {
+    var payload = Object.assign({}, item);
+    delete payload.id;
+    return request('/api/admin/catalog/' + encodeURIComponent(category) + '/' + encodeURIComponent(id), { method: 'PUT', json: payload });
+  }
+  async function deleteCatalogItem(category, id) {
+    return request('/api/admin/catalog/' + encodeURIComponent(category) + '/' + encodeURIComponent(id), { method: 'DELETE' });
+  }
+  async function reorderCatalog(category, itemIds) {
+    return request('/api/admin/catalog/' + encodeURIComponent(category) + '/order', { method: 'PUT', json: { itemIds: itemIds } });
+  }
+  async function updateInquiry(id, payload) {
+    return request('/api/admin/inquiries/' + encodeURIComponent(id), { method: 'PATCH', json: payload });
+  }
+  async function deleteInquiry(id) {
+    return request('/api/admin/inquiries/' + encodeURIComponent(id), { method: 'DELETE' });
+  }
+
   function loadEstimate() { return loadRaw(KEYS.estimate, null); }
   function saveEstimate(payload) { saveRaw(KEYS.estimate, payload); }
-
-  /** 셀프견적 작성 중 자동 저장 데이터 */
+  function clearEstimate() { removeRaw(KEYS.estimate); }
   function loadEstimateDraft() {
     return loadRaw(KEYS.estimateDraft, null, function (draft) {
       return !!draft && typeof draft === 'object' &&
@@ -168,37 +231,53 @@ window.JSTStore = (function () {
   }
   function saveEstimateDraft(draft) { saveRaw(KEYS.estimateDraft, draft); }
   function clearEstimateDraft() { removeRaw(KEYS.estimateDraft); }
-
-  /** 홈 → 셀프견적 전달 일정·인원 */
   function loadTripInfo() { return loadRaw(KEYS.tripInfo, null); }
   function saveTripInfo(info) { saveRaw(KEYS.tripInfo, info); }
 
-  // ── 관리자 세션 (프로토타입: 실제 인증은 M3) ────────────────
-  function hasAdminSession() {
-    try { return !!localStorage.getItem(KEYS.adminSession); } catch (e) { return false; }
-  }
-  function setAdminSession() {
-    try { localStorage.setItem(KEYS.adminSession, '1'); } catch (e) {}
-  }
-  function clearAdminSession() {
-    try { localStorage.removeItem(KEYS.adminSession); } catch (e) {}
-  }
-
   return {
     KEYS: KEYS,
-    esc: esc, won: won, todayDateStr: todayDateStr,
+    ApiError: ApiError,
+    apiUrl: apiUrl,
+    esc: esc,
+    won: won,
+    todayDateStr: todayDateStr,
     defaultCatalog: defaultCatalog,
     defaultDiscountConfig: defaultDiscountConfig,
     mergeDiscountConfig: mergeDiscountConfig,
-    defaultNotices: defaultNotices,
-    defaultInquiries: defaultInquiries,
-    loadCatalog: loadCatalog, saveCatalog: saveCatalog,
-    loadDiscountConfig: loadDiscountConfig, saveDiscountConfig: saveDiscountConfig,
-    loadNotices: loadNotices, saveNotices: saveNotices,
-    loadInquiries: loadInquiries, saveInquiries: saveInquiries, verifyInquiryPassword: verifyInquiryPassword,
-    loadEstimate: loadEstimate, saveEstimate: saveEstimate,
-    loadEstimateDraft: loadEstimateDraft, saveEstimateDraft: saveEstimateDraft, clearEstimateDraft: clearEstimateDraft,
-    loadTripInfo: loadTripInfo, saveTripInfo: saveTripInfo,
-    hasAdminSession: hasAdminSession, setAdminSession: setAdminSession, clearAdminSession: clearAdminSession,
+    loadCatalog: loadCatalog,
+    loadDiscountConfig: loadDiscountConfig,
+    loadNotices: loadNotices,
+    getNotice: getNotice,
+    loadInquiries: loadInquiries,
+    getInquiry: getInquiry,
+    verifyInquiryPassword: verifyInquiryPassword,
+    createInquiry: createInquiry,
+    loginAdmin: loginAdmin,
+    logoutAdmin: logoutAdmin,
+    getAdminSession: getAdminSession,
+    loadAdminCatalog: loadAdminCatalog,
+    loadAdminDiscountConfig: loadAdminDiscountConfig,
+    loadAdminNotices: loadAdminNotices,
+    loadAdminInquiries: loadAdminInquiries,
+    createNotice: createNotice,
+    updateNotice: updateNotice,
+    deleteNotice: deleteNotice,
+    uploadNoticeFile: uploadNoticeFile,
+    deleteNoticeFile: deleteNoticeFile,
+    saveDiscountConfig: saveDiscountConfig,
+    createCatalogItem: createCatalogItem,
+    updateCatalogItem: updateCatalogItem,
+    deleteCatalogItem: deleteCatalogItem,
+    reorderCatalog: reorderCatalog,
+    updateInquiry: updateInquiry,
+    deleteInquiry: deleteInquiry,
+    loadEstimate: loadEstimate,
+    saveEstimate: saveEstimate,
+    clearEstimate: clearEstimate,
+    loadEstimateDraft: loadEstimateDraft,
+    saveEstimateDraft: saveEstimateDraft,
+    clearEstimateDraft: clearEstimateDraft,
+    loadTripInfo: loadTripInfo,
+    saveTripInfo: saveTripInfo,
   };
 })();

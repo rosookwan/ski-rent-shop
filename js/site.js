@@ -3,7 +3,7 @@
  *
  * - 데이터 조회/저장은 전부 JSTStore(js/store.js)에 위임한다.
  * - 페이지 스크립트는 window.JST 하나만 쓰면 된다 (JSTStore 기능 포함).
- * - 로드 순서: store.js → site.js → 페이지 스크립트
+ * - 로드 순서: config.js → store.js → site.js → 페이지 스크립트
  */
 window.JST = (function () {
   'use strict';

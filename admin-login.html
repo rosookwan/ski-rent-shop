@@ -43,24 +43,61 @@
         <input id="loginPassword" type="password" placeholder="비밀번호를 입력하세요" style="padding:13px 14px;border-radius:12px;border:1.5px solid #E6E8EC;font-size:14px;color:#14263F;width:100%;font-family:inherit;" />
       </div>
     </div>
+    <div id="loginError" role="alert" style="display:none;font-size:12.5px;color:#E0483E;font-weight:600;line-height:1.5;"></div>
     <button id="loginBtn" style="padding:14px;border-radius:13px;background:#FF6A3D;color:#FFFFFF;font-weight:800;font-size:15px;border:none;cursor:pointer;font-family:inherit;">로그인</button>
     <a href="index.html" style="text-align:center;font-size:12.5px;color:#8A93A1;font-weight:600;text-decoration:none;">사이트로 돌아가기</a>
   </div>
 </div>
 
+<script src="js/config.js"></script>
 <script src="js/store.js"></script>
 <script>
-  // 프로토타입: 아이디/비밀번호 검증 없이 세션만 생성 (실제 인증은 M3)
-  function login() {
-    JSTStore.setAdminSession();
-    window.location.href = 'admin.html';
+  var submitting = false;
+  function showError(message) {
+    var error = document.getElementById('loginError');
+    error.textContent = message || '';
+    error.style.display = message ? 'block' : 'none';
+  }
+  function setSubmitting(value) {
+    submitting = value;
+    var button = document.getElementById('loginBtn');
+    button.disabled = value;
+    button.textContent = value ? '로그인하고 있어요…' : '로그인';
+    button.style.opacity = value ? '.65' : '1';
+    button.style.cursor = value ? 'wait' : 'pointer';
+  }
+  async function login() {
+    if (submitting) return;
+    var loginId = document.getElementById('loginUsername').value.trim();
+    var password = document.getElementById('loginPassword').value;
+    if (!loginId || !password) {
+      showError('아이디와 비밀번호를 모두 입력해주세요.');
+      return;
+    }
+    setSubmitting(true);
+    showError('');
+    try {
+      await JSTStore.loginAdmin(loginId, password);
+      window.location.href = 'admin.html';
+    } catch (error) {
+      showError(error.message || '로그인하지 못했어요.');
+    } finally {
+      setSubmitting(false);
+    }
   }
   document.getElementById('loginBtn').addEventListener('click', login);
   ['loginUsername', 'loginPassword'].forEach(function (id) {
     document.getElementById(id).addEventListener('keydown', function (e) {
       if (e.key === 'Enter') login();
+      else showError('');
     });
   });
+  if (new URLSearchParams(window.location.search).get('expired') === '1') {
+    showError('로그인 시간이 만료됐어요. 다시 로그인해주세요.');
+  }
+  JSTStore.getAdminSession().then(function () {
+    window.location.href = 'admin.html';
+  }).catch(function () {});
 </script>
 </body>
 </html>

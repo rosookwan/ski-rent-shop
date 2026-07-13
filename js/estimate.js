@@ -4,7 +4,8 @@
   JST.injectChrome('selfcalc', { hideMobileBar: true });
 
   var esc = JST.esc, won = JST.won;
-  var catalog = JST.loadCatalog();
+  var catalog = JST.defaultCatalog();
+  var catalogLoading = true, catalogError = '';
 
   function defaultState() {
     return {
@@ -240,6 +241,14 @@
   }
 
   function renderLift() {
+    if (catalogLoading) {
+      document.getElementById('liftSection').innerHTML = '<div style="padding:24px 0;text-align:center;color:#8A93A1;font-size:13px;">품목을 불러오고 있어요.</div>';
+      return;
+    }
+    if (catalogError) {
+      document.getElementById('liftSection').innerHTML = '<div style="padding:20px;text-align:center;color:#E0483E;font-size:13px;line-height:1.6;">' + esc(catalogError) + '<br><button data-action="retry-catalog" style="margin-top:9px;padding:8px 13px;border-radius:9px;border:none;background:#14263F;color:#FFFFFF;font-weight:700;cursor:pointer;font-family:inherit;">다시 불러오기</button></div>';
+      return;
+    }
     var days = getDays();
     var activeIdx = Math.min(state.activeLiftDayIndex, days.length - 1);
     var helper;
@@ -263,6 +272,12 @@
   }
 
   function renderRental() {
+    if (catalogLoading || catalogError) {
+      document.getElementById('rentalSection').innerHTML = catalogLoading
+        ? '<div style="padding:24px 0;text-align:center;color:#8A93A1;font-size:13px;">품목을 불러오고 있어요.</div>'
+        : '<div style="padding:20px;text-align:center;color:#E0483E;font-size:13px;">품목을 불러온 뒤 이용할 수 있어요.</div>';
+      return;
+    }
     var days = getDays();
     var activeIdx = Math.min(state.activeRentalDayIndex, days.length - 1);
     var helper;
@@ -548,6 +563,7 @@
       JST.clearEstimateDraft();
       renderAll();
     },
+    'retry-catalog': function () { loadCatalog(); },
   };
 
   document.addEventListener('click', function (e) {
@@ -584,9 +600,20 @@
     if (isMobile !== state.isMobile) { state.isMobile = isMobile; renderAll(); }
   });
 
-  window.addEventListener('storage', function (e) {
-    if (!e || e.key === JST.KEYS.catalog) { catalog = JST.loadCatalog(); renderAll(); }
-  });
+  async function loadCatalog() {
+    catalogLoading = true;
+    catalogError = '';
+    renderAll();
+    try {
+      catalog = await JST.loadCatalog();
+    } catch (error) {
+      catalogError = error.message || '품목을 불러오지 못했어요.';
+    } finally {
+      catalogLoading = false;
+      renderAll();
+    }
+  }
 
   renderAll();
+  loadCatalog();
 })();
