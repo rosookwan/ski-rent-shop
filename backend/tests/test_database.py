@@ -23,6 +23,7 @@ EXPECTED_TABLES = {
     "notice_files",
     "notices",
     "schema_migrations",
+    "seed_runs",
 }
 
 
@@ -53,7 +54,7 @@ class DatabaseMigrationTests(unittest.TestCase):
 
         with sqlite3.connect(self.db_path) as connection:
             migration_count = connection.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]
-            self.assertEqual(1, migration_count)
+            self.assertEqual(2, migration_count)
 
     def test_applied_migration_cannot_be_modified(self) -> None:
         migrations_dir = Path(self.temp_dir.name) / "migrations"

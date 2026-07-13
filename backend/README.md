@@ -1,7 +1,7 @@
 # 준스키타운 백엔드
 
-M3에서 사용하는 FastAPI + SQLite 백엔드다. 현재 R9 범위는 실행 기반, DB 마이그레이션,
-상태 확인 API까지 포함한다.
+M3에서 사용하는 FastAPI + SQLite 백엔드다. 현재 R10까지 실행 기반, DB 마이그레이션,
+공용 데이터 API와 초기 데이터 시딩을 포함한다.
 
 ## 디렉터리
 
@@ -10,7 +10,11 @@ backend/
 ├── app/
 │   ├── config.py       # 환경변수 설정
 │   ├── database.py     # SQLite 연결·마이그레이션·상태 점검
-│   └── main.py         # FastAPI 앱과 /api/health
+│   ├── seed.py         # 기본 품목·공지·할인 1회 시딩
+│   ├── repository.py   # SQL과 UI 응답 변환
+│   ├── schemas.py      # 공용 API 요청·응답 검증
+│   ├── security.py     # 문의 비밀번호 scrypt 해시
+│   └── main.py         # FastAPI 앱 진입점
 ├── migrations/         # 순번 기반 SQL 마이그레이션
 ├── tests/              # unittest 자동 테스트
 ├── .env.example        # 환경변수 이름과 개발 예시
@@ -50,6 +54,22 @@ python -m unittest discover -s tests -v
 ```
 
 테스트는 임시 디렉터리의 SQLite DB만 사용하며 `backend/data/`의 개발 DB를 변경하지 않는다.
+
+## 공용 API
+
+| 메서드 | 경로 | 용도 |
+|---|---|---|
+| GET | `/api/health` | 서버·DB 상태 확인 |
+| GET | `/api/notices?page=1&pageSize=10` | 고정 우선 공지 목록 |
+| GET | `/api/notices/{id}` | 공지 상세 |
+| GET | `/api/catalog` | 노출 품목 목록 |
+| GET | `/api/discounts` | 할인 설정 |
+| GET | `/api/inquiries?page=1&pageSize=10` | 개인정보를 제외한 문의 목록 |
+| POST | `/api/inquiries` | 문의 등록 |
+| GET | `/api/inquiries/{id}` | 공개 문의 상세 |
+| POST | `/api/inquiries/{id}/verify` | 비밀글 비밀번호 확인과 상세 조회 |
+
+문의 목록과 공개 상세에는 연락처, 이메일, 비밀번호 해시, 견적 원본을 포함하지 않는다.
 
 ## 마이그레이션 규칙
 

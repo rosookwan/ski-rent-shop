@@ -11,8 +11,10 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from .api import router as public_api_router
 from .config import Settings
 from .database import MigrationError, check_database, initialize_database
+from .seed import seed_defaults
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -24,6 +26,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.settings.upload_dir.mkdir(parents=True, exist_ok=True)
         initialize_database(app.state.settings.db_path)
+        seed_defaults(app.state.settings.db_path)
         yield
 
     app = FastAPI(
@@ -32,6 +35,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.settings = resolved_settings
+    app.include_router(public_api_router)
 
     if resolved_settings.allowed_origins:
         app.add_middleware(
