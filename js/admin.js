@@ -65,6 +65,14 @@
     var n = parseFloat(v || '0');
     return isNaN(n) ? 0 : Math.max(0, n);
   }
+  function parseCatalogPrice(v) {
+    var digits = String(v == null ? '' : v).replace(/[^0-9]/g, '');
+    return digits ? nonNegInt(digits) : 0;
+  }
+  function formatCatalogPrice(v) {
+    var digits = String(v == null ? '' : v).replace(/[^0-9]/g, '');
+    return digits ? parseCatalogPrice(digits).toLocaleString('ko-KR') : '';
+  }
 
   // ── 스타일 조각 ─────────────────────────────────────────────
   var S = {
@@ -265,16 +273,23 @@
     var html = '<div style="font-size:12.5px;font-weight:700;color:#8A93A1;margin-bottom:14px;">' + items.length + '개 품목</div>';
 
     html += '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">';
-    items.forEach(function (it) {
-      html += '<div style="border:1px solid #E6E8EC;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;">' +
-        '<div style="display:flex;align-items:center;gap:8px;">' +
-          '<input type="text" data-input="item-field" data-id="' + esc(it.id) + '" data-field="name" value="' + esc(it.name) + '" placeholder="이름" style="flex:1;min-width:0;padding:10px 12px;border-radius:10px;border:1.5px solid #E6E8EC;font-size:14px;font-weight:700;color:#14263F;" />' +
-          '<button data-action="remove-item" data-id="' + esc(it.id) + '" aria-label="삭제" style="' + S.deleteBtn + '">×</button>' +
+    items.forEach(function (it, index) {
+      var hidden = !!it.hidden;
+      html += '<div data-item-row="' + esc(it.id) + '" style="border:1px solid #E6E8EC;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;background:' + (hidden ? '#FAFAFB' : '#FFFFFF') + ';opacity:' + (hidden ? '.58' : '1') + ';transition:opacity .16s ease;">' +
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
+          '<input type="text" data-input="item-field" data-id="' + esc(it.id) + '" data-field="name" value="' + esc(it.name) + '" placeholder="이름" style="flex:1;min-width:180px;padding:10px 12px;border-radius:10px;border:1.5px solid #E6E8EC;font-size:14px;font-weight:700;color:#14263F;" />' +
+          (hidden ? '<span style="flex:none;padding:4px 8px;border-radius:6px;background:#E6E8EC;color:#6B7280;font-size:11px;font-weight:800;">숨김</span>' : '') +
+          '<div style="display:flex;align-items:center;gap:6px;flex:none;">' +
+            '<button data-action="move-item" data-id="' + esc(it.id) + '" data-direction="up" aria-label="' + esc(it.name) + ' 위로 이동"' + (index === 0 ? ' disabled' : '') + ' style="width:36px;height:36px;border-radius:10px;border:1.5px solid #E6E8EC;background:#FFFFFF;color:#4B5563;font-size:15px;font-weight:800;cursor:' + (index === 0 ? 'not-allowed' : 'pointer') + ';opacity:' + (index === 0 ? '.38' : '1') + ';font-family:inherit;">↑</button>' +
+            '<button data-action="move-item" data-id="' + esc(it.id) + '" data-direction="down" aria-label="' + esc(it.name) + ' 아래로 이동"' + (index === items.length - 1 ? ' disabled' : '') + ' style="width:36px;height:36px;border-radius:10px;border:1.5px solid #E6E8EC;background:#FFFFFF;color:#4B5563;font-size:15px;font-weight:800;cursor:' + (index === items.length - 1 ? 'not-allowed' : 'pointer') + ';opacity:' + (index === items.length - 1 ? '.38' : '1') + ';font-family:inherit;">↓</button>' +
+            '<button data-action="toggle-item-hidden" data-id="' + esc(it.id) + '" aria-pressed="' + hidden + '" style="height:36px;padding:0 11px;border-radius:10px;border:1.5px solid ' + (hidden ? '#D8DCE3' : '#E6E8EC') + ';background:' + (hidden ? '#F0F1F3' : '#FFFFFF') + ';color:#4B5563;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">' + (hidden ? '다시 노출' : '숨기기') + '</button>' +
+            '<button data-action="remove-item" data-id="' + esc(it.id) + '" aria-label="' + esc(it.name) + ' 삭제" style="' + S.deleteBtn + '">×</button>' +
+          '</div>' +
         '</div>' +
         '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;">' +
           '<input type="text" data-input="item-field" data-id="' + esc(it.id) + '" data-field="desc" value="' + esc(it.desc) + '" placeholder="설명 (예: 09:00–17:00)" style="' + S.input + '" />' +
           '<div style="display:flex;align-items:center;gap:6px;">' +
-            '<input type="number" data-input="item-field" data-id="' + esc(it.id) + '" data-field="price" value="' + esc(it.price) + '" placeholder="가격" style="flex:1;min-width:0;' + S.input + '" />' +
+            '<input type="text" inputmode="numeric" data-input="item-field" data-id="' + esc(it.id) + '" data-field="price" value="' + esc(formatCatalogPrice(it.price)) + '" placeholder="가격" style="flex:1;min-width:0;' + S.input + '" />' +
             '<span style="flex:none;font-size:13px;color:#8A93A1;font-weight:600;">원</span>' +
           '</div>' +
         '</div>' +
@@ -289,7 +304,7 @@
         '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;">' +
           '<input type="text" data-input="draft-desc" value="' + esc(state.draftDesc) + '" placeholder="설명 (선택)" style="' + S.input + '" />' +
           '<div style="display:flex;align-items:center;gap:6px;">' +
-            '<input type="number" data-input="draft-price" value="' + esc(state.draftPrice) + '" placeholder="가격" style="flex:1;min-width:0;' + S.input + '" />' +
+            '<input type="text" inputmode="numeric" data-input="draft-price" value="' + esc(state.draftPrice) + '" placeholder="가격" style="flex:1;min-width:0;' + S.input + '" />' +
             '<span style="flex:none;font-size:13px;color:#8A93A1;font-weight:600;">원</span>' +
           '</div>' +
         '</div>' +
@@ -620,16 +635,35 @@
       state.catalog[cat] = state.catalog[cat].filter(function (it) { return it.id !== el.dataset.id; });
       persistCatalog(); renderAll();
     },
+    'move-item': function (el) {
+      var cat = state.activeTab;
+      var items = state.catalog[cat] || [];
+      var index = items.findIndex(function (it) { return it.id === el.dataset.id; });
+      if (index < 0) return;
+      var target = el.dataset.direction === 'up' ? index - 1 : index + 1;
+      if (target < 0 || target >= items.length) return;
+      var moved = items[index];
+      items[index] = items[target];
+      items[target] = moved;
+      persistCatalog(); renderAll();
+    },
+    'toggle-item-hidden': function (el) {
+      var cat = state.activeTab;
+      var item = (state.catalog[cat] || []).find(function (it) { return it.id === el.dataset.id; });
+      if (!item) return;
+      item.hidden = !item.hidden;
+      persistCatalog(); renderAll();
+    },
     'add-item': function () {
       var cat = state.activeTab;
       var name = state.draftName.trim();
-      var price = parseInt(state.draftPrice, 10);
+      var price = parseCatalogPrice(state.draftPrice);
       if (!name) { state.draftError = '이름을 입력해주세요'; renderAll(); return; }
-      if (isNaN(price) || price < 0) { state.draftError = '올바른 가격을 입력해주세요'; renderAll(); return; }
+      if (!String(state.draftPrice || '').replace(/[^0-9]/g, '')) { state.draftError = '올바른 가격을 입력해주세요'; renderAll(); return; }
       state.catalog[cat].push({
         id: cat + '_' + Date.now(),
         name: name, desc: state.draftDesc.trim(), price: price,
-        discountGeneral: 0, discountAffiliate: 0,
+        discountGeneral: 0, discountAffiliate: 0, hidden: false,
       });
       state.draftName = ''; state.draftDesc = ''; state.draftPrice = ''; state.draftError = '';
       persistCatalog(); renderAll();
@@ -765,7 +799,10 @@
       var it = (state.catalog[cat] || []).find(function (x) { return x.id === el.dataset.id; });
       if (!it) return;
       var field = el.dataset.field;
-      if (field === 'price') it.price = nonNegInt(v);
+      if (field === 'price') {
+        it.price = parseCatalogPrice(v);
+        el.value = formatCatalogPrice(v);
+      }
       else if (field === 'discountGeneral' || field === 'discountAffiliate') it[field] = nonNegFloat(v);
       else it[field] = v;
       persistCatalog();
@@ -791,7 +828,11 @@
       state.answerDrafts[String(el.dataset.id)] = v;
     } else if (kind === 'draft-name') { state.draftName = v; state.draftError = ''; }
     else if (kind === 'draft-desc') { state.draftDesc = v; }
-    else if (kind === 'draft-price') { state.draftPrice = v; state.draftError = ''; }
+    else if (kind === 'draft-price') {
+      state.draftPrice = formatCatalogPrice(v);
+      el.value = state.draftPrice;
+      state.draftError = '';
+    }
     else if (kind === 'draft-keyword') { state.draftKeyword = v; }
     else if (kind === 'notice-form-tag') { state.noticeFormTag = v; }
     else if (kind === 'notice-form-title') { state.noticeFormTitle = v; state.noticeError = ''; }

@@ -43,7 +43,8 @@
 { lift: [Item], equipment: [Item], clothing: [Item], safety: [Item] }
 // Item
 { id: 'full', name: '종일권', desc: '09:00–17:00', price: 55000,
-  discountGeneral: 0, discountAffiliate: 0 }   // 품목별 정액할인 오버라이드(0=기본값 사용)
+  discountGeneral: 0, discountAffiliate: 0, hidden: false }
+// hidden=true이면 셀프견적에서 숨김. 할인 값은 품목별 정액할인 오버라이드(0=기본값 사용)
 
 // jst_discount_config — 할인 설정
 { general:   { enabled: true, type: 'percent'|'fixed', value: 5 },

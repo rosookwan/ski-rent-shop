@@ -60,27 +60,27 @@ window.JSTStore = (function () {
   function defaultCatalog() {
     return {
       lift: [
-        { id: 'full', name: '종일권', desc: '09:00–17:00', price: 55000, discountGeneral: 0, discountAffiliate: 0 },
-        { id: 'am', name: '오전권', desc: '09:00–13:00', price: 40000, discountGeneral: 0, discountAffiliate: 0 },
-        { id: 'pm', name: '오후권', desc: '13:00–17:00', price: 40000, discountGeneral: 0, discountAffiliate: 0 },
-        { id: 'night', name: '야간권', desc: '18:30–22:00', price: 35000, discountGeneral: 0, discountAffiliate: 0 },
+        { id: 'full', name: '종일권', desc: '09:00–17:00', price: 55000, discountGeneral: 0, discountAffiliate: 0, hidden: false },
+        { id: 'am', name: '오전권', desc: '09:00–13:00', price: 40000, discountGeneral: 0, discountAffiliate: 0, hidden: false },
+        { id: 'pm', name: '오후권', desc: '13:00–17:00', price: 40000, discountGeneral: 0, discountAffiliate: 0, hidden: false },
+        { id: 'night', name: '야간권', desc: '18:30–22:00', price: 35000, discountGeneral: 0, discountAffiliate: 0, hidden: false },
       ],
       equipment: [
-        { id: 'ski_set', name: '스키 풀세트', desc: '스키+폴+부츠', price: 25000, discountGeneral: 0, discountAffiliate: 0 },
-        { id: 'board_set', name: '보드 풀세트', desc: '보드+부츠', price: 28000, discountGeneral: 0, discountAffiliate: 0 },
-        { id: 'ski_pole', name: '스키+폴', desc: '부츠 제외', price: 18000, discountGeneral: 0, discountAffiliate: 0 },
+        { id: 'ski_set', name: '스키 풀세트', desc: '스키+폴+부츠', price: 25000, discountGeneral: 0, discountAffiliate: 0, hidden: false },
+        { id: 'board_set', name: '보드 풀세트', desc: '보드+부츠', price: 28000, discountGeneral: 0, discountAffiliate: 0, hidden: false },
+        { id: 'ski_pole', name: '스키+폴', desc: '부츠 제외', price: 18000, discountGeneral: 0, discountAffiliate: 0, hidden: false },
       ],
       clothing: [
-        { id: 'jacket', name: '상의 자켓', desc: '상의만', price: 15000, discountGeneral: 0, discountAffiliate: 0 },
-        { id: 'pants', name: '하의 팬츠', desc: '하의만', price: 15000, discountGeneral: 0, discountAffiliate: 0 },
-        { id: 'set', name: '상하의 세트', desc: '자켓+팬츠', price: 25000, discountGeneral: 0, discountAffiliate: 0 },
-        { id: 'glove', name: '장갑', desc: '프리사이즈', price: 5000, discountGeneral: 0, discountAffiliate: 0 },
+        { id: 'jacket', name: '상의 자켓', desc: '상의만', price: 15000, discountGeneral: 0, discountAffiliate: 0, hidden: false },
+        { id: 'pants', name: '하의 팬츠', desc: '하의만', price: 15000, discountGeneral: 0, discountAffiliate: 0, hidden: false },
+        { id: 'set', name: '상하의 세트', desc: '자켓+팬츠', price: 25000, discountGeneral: 0, discountAffiliate: 0, hidden: false },
+        { id: 'glove', name: '장갑', desc: '프리사이즈', price: 5000, discountGeneral: 0, discountAffiliate: 0, hidden: false },
       ],
       safety: [
-        { id: 'helmet', name: '헬멧', desc: '전 사이즈', price: 8000, discountGeneral: 0, discountAffiliate: 0 },
-        { id: 'wrist', name: '손목보호대', desc: '프리사이즈', price: 5000, discountGeneral: 0, discountAffiliate: 0 },
-        { id: 'goggle', name: '고글', desc: 'UV 코팅', price: 7000, discountGeneral: 0, discountAffiliate: 0 },
-        { id: 'hip', name: '힙 프로텍터', desc: '프리사이즈', price: 6000, discountGeneral: 0, discountAffiliate: 0 },
+        { id: 'helmet', name: '헬멧', desc: '전 사이즈', price: 8000, discountGeneral: 0, discountAffiliate: 0, hidden: false },
+        { id: 'wrist', name: '손목보호대', desc: '프리사이즈', price: 5000, discountGeneral: 0, discountAffiliate: 0, hidden: false },
+        { id: 'goggle', name: '고글', desc: 'UV 코팅', price: 7000, discountGeneral: 0, discountAffiliate: 0, hidden: false },
+        { id: 'hip', name: '힙 프로텍터', desc: '프리사이즈', price: 6000, discountGeneral: 0, discountAffiliate: 0, hidden: false },
       ],
     };
   }

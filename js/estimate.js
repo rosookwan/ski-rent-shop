@@ -77,7 +77,7 @@
   function getSummaryLines(days) {
     var lines = [];
     days.forEach(function (day) {
-      catalog.lift.forEach(function (t) {
+      catalog.lift.filter(function (t) { return !t.hidden; }).forEach(function (t) {
         var qty = state.liftQty[day.key + '__' + t.id] || 0;
         if (qty > 0) {
           var dayPart = day.key === 'flat' ? '' : (day.label + ' · ');
@@ -92,7 +92,7 @@
     var catLabels = { equipment: '장비 렌탈', clothing: '의류 렌탈', safety: '안전장비' };
     days.forEach(function (day) {
       ['equipment', 'clothing', 'safety'].forEach(function (cat) {
-        catalog[cat].forEach(function (it) {
+        catalog[cat].filter(function (it) { return !it.hidden; }).forEach(function (it) {
           var qty = state[cat + 'Qty'][day.key + '__' + it.id] || 0;
           if (qty > 0) {
             var dayPart = day.key === 'flat' ? '' : (day.label + ' · ');
@@ -213,7 +213,7 @@
 
     var day = days[activeIdx];
     html += '<div>';
-    catalog.lift.forEach(function (t) {
+    catalog.lift.filter(function (t) { return !t.hidden; }).forEach(function (t) {
       var qty = state.liftQty[day.key + '__' + t.id] || 0;
       html += counterRow(t.name, t.desc, qty,
         'data-action="lift-qty" data-id="' + esc(t.id) + '" data-delta="-1"',
@@ -242,7 +242,7 @@
     var day = days[activeIdx];
     var cat = state.activeRentalTab;
     html += '<div>';
-    catalog[cat].forEach(function (it) {
+    catalog[cat].filter(function (it) { return !it.hidden; }).forEach(function (it) {
       var qty = state[cat + 'Qty'][day.key + '__' + it.id] || 0;
       html += counterRow(it.name, it.desc, qty,
         'data-action="rental-qty" data-id="' + esc(it.id) + '" data-delta="-1"',
@@ -442,7 +442,7 @@
       var days = getDays();
       var idx = Math.min(state.activeLiftDayIndex, days.length - 1);
       var srcKey = days[idx].key + '__';
-      catalog.lift.forEach(function (t) {
+      catalog.lift.filter(function (t) { return !t.hidden; }).forEach(function (t) {
         var v = state.liftQty[srcKey + t.id] || 0;
         days.forEach(function (d) { state.liftQty[d.key + '__' + t.id] = v; });
       });
@@ -463,7 +463,7 @@
       var idx = Math.min(state.activeRentalDayIndex, days.length - 1);
       var srcKey = days[idx].key + '__';
       ['equipment', 'clothing', 'safety'].forEach(function (cat) {
-        catalog[cat].forEach(function (it) {
+        catalog[cat].filter(function (it) { return !it.hidden; }).forEach(function (it) {
           var v = state[cat + 'Qty'][srcKey + it.id] || 0;
           days.forEach(function (d) { state[cat + 'Qty'][d.key + '__' + it.id] = v; });
         });
