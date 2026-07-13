@@ -10,9 +10,15 @@
     if (!isNaN(id)) state.selectedId = id;
   } catch (e) {}
 
+  function orderedNotices() {
+    return state.notices.filter(function (n) { return !!n.pinned; })
+      .concat(state.notices.filter(function (n) { return !n.pinned; }));
+  }
+
   function render() {
     var app = document.getElementById('app');
     if (state.selectedId === null) {
+      var notices = orderedNotices();
       var html = '<div style="margin-bottom:24px;">' +
         '<div style="font-size:12.5px;font-weight:800;letter-spacing:.06em;color:#FF6A3D;text-transform:uppercase;margin-bottom:8px;">NOTICE</div>' +
         '<h1 style="margin:0 0 8px;font-size:clamp(24px,5vw,30px);font-weight:800;color:#14263F;letter-spacing:-0.02em;">공지사항</h1>' +
@@ -20,8 +26,9 @@
       '</div>';
 
       html += '<div style="background:#FFFFFF;border:1px solid #E6E8EC;border-radius:18px;overflow:hidden;">';
-      state.notices.slice(0, state.visibleCount).forEach(function (n) {
+      notices.slice(0, state.visibleCount).forEach(function (n) {
         html += '<button data-action="open" data-id="' + JST.esc(n.id) + '" style="width:100%;display:flex;align-items:center;gap:10px;padding:16px clamp(14px,3vw,20px);background:none;border:none;border-bottom:1px solid #F0F1F3;cursor:pointer;text-align:left;font-family:inherit;">' +
+          (n.pinned ? '<span title="상단 고정" aria-label="상단 고정" style="flex:none;font-size:14px;">📌</span>' : '') +
           (n.tag ? '<span style="flex:none;padding:4px 9px;border-radius:6px;background:#FFF3EC;color:#FF6A3D;font-size:11.5px;font-weight:800;">' + JST.esc(n.tag) + '</span>' : '') +
           '<span style="flex:1;min-width:0;font-size:14.5px;color:#14263F;font-weight:700;">' + JST.esc(n.title) + '</span>' +
           '<span style="flex:none;font-size:12.5px;color:#8A93A1;">' + JST.esc(n.date) + '</span>' +
@@ -33,7 +40,7 @@
       }
       html += '</div>';
 
-      if (state.visibleCount < state.notices.length) {
+      if (state.visibleCount < notices.length) {
         html += '<button data-action="show-more" style="display:block;width:100%;margin-top:14px;padding:14px;border-radius:12px;border:1.5px solid #E6E8EC;background:#FFFFFF;color:#4B5563;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">더보기</button>';
       }
       app.innerHTML = html;

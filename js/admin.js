@@ -24,7 +24,9 @@
     showResetConfirm: false,
     draftName: '', draftDesc: '', draftPrice: '', draftError: '',
     draftKeyword: '',
-    draftNoticeTag: '', draftNoticeTitle: '', draftNoticeBody: '', noticeError: '',
+    noticeView: 'list', noticeSearch: '', noticePage: 1,
+    noticeEditingId: null, noticeDeleteId: null,
+    noticeFormTag: '', noticeFormTitle: '', noticeFormBody: '', noticeFormPinned: false, noticeError: '',
   };
 
   var TABS = [
@@ -284,38 +286,120 @@
     return html;
   }
 
-  function renderNoticeTab() {
-    var html = '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">';
-    state.notices.forEach(function (n) {
-      html += '<div style="border:1px solid #E6E8EC;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;">' +
-        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
-          '<input type="text" data-input="notice-field" data-id="' + n.id + '" data-field="tag" value="' + esc(n.tag) + '" placeholder="태그(선택)" style="width:110px;flex:none;padding:10px 12px;border-radius:10px;border:1.5px solid #E6E8EC;font-size:13px;color:#14263F;" />' +
-          '<input type="text" data-input="notice-field" data-id="' + n.id + '" data-field="title" value="' + esc(n.title) + '" placeholder="제목" style="flex:1;min-width:160px;padding:10px 12px;border-radius:10px;border:1.5px solid #E6E8EC;font-size:14px;font-weight:700;color:#14263F;" />' +
+  function orderedNotices() {
+    return state.notices.filter(function (n) { return !!n.pinned; })
+      .concat(state.notices.filter(function (n) { return !n.pinned; }));
+  }
+
+  function filteredNotices() {
+    var query = (state.noticeSearch || '').trim().toLowerCase();
+    return orderedNotices().filter(function (n) {
+      if (!query) return true;
+      return String(n.title || '').toLowerCase().indexOf(query) !== -1 ||
+        String(n.body || '').toLowerCase().indexOf(query) !== -1;
+    });
+  }
+
+  function renderNoticePagination(totalPages) {
+    if (totalPages <= 1) return '';
+    var start = Math.max(1, Math.min(state.noticePage - 2, totalPages - 4));
+    var end = Math.min(totalPages, start + 4);
+    var html = '<div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:16px;flex-wrap:wrap;">' +
+      '<button data-action="notice-page" data-page="' + Math.max(1, state.noticePage - 1) + '"' + (state.noticePage === 1 ? ' disabled' : '') + ' aria-label="이전 페이지" style="width:36px;height:36px;border-radius:9px;border:1px solid #E6E8EC;background:#FFFFFF;color:#4B5563;font-weight:800;cursor:' + (state.noticePage === 1 ? 'not-allowed' : 'pointer') + ';opacity:' + (state.noticePage === 1 ? '.42' : '1') + ';font-family:inherit;">◀</button>';
+    for (var page = start; page <= end; page++) {
+      var active = page === state.noticePage;
+      html += '<button data-action="notice-page" data-page="' + page + '"' + (active ? ' aria-current="page"' : '') + ' style="width:36px;height:36px;border-radius:9px;border:' + (active ? 'none' : '1px solid #E6E8EC') + ';background:' + (active ? '#14263F' : '#FFFFFF') + ';color:' + (active ? '#FFFFFF' : '#4B5563') + ';font-weight:800;cursor:pointer;font-family:inherit;">' + page + '</button>';
+    }
+    html += '<button data-action="notice-page" data-page="' + Math.min(totalPages, state.noticePage + 1) + '"' + (state.noticePage === totalPages ? ' disabled' : '') + ' aria-label="다음 페이지" style="width:36px;height:36px;border-radius:9px;border:1px solid #E6E8EC;background:#FFFFFF;color:#4B5563;font-weight:800;cursor:' + (state.noticePage === totalPages ? 'not-allowed' : 'pointer') + ';opacity:' + (state.noticePage === totalPages ? '.42' : '1') + ';font-family:inherit;">▶</button>' +
+    '</div>';
+    return html;
+  }
+
+  function renderNoticeListResults() {
+    var notices = filteredNotices();
+    var totalPages = Math.max(1, Math.ceil(notices.length / 10));
+    state.noticePage = Math.max(1, Math.min(state.noticePage, totalPages));
+    var pageNotices = notices.slice((state.noticePage - 1) * 10, state.noticePage * 10);
+    var html = '<div style="font-size:12.5px;font-weight:700;color:#8A93A1;margin-bottom:12px;">' + notices.length + '건</div>' +
+      '<div style="border:1px solid #E6E8EC;border-radius:14px;overflow:hidden;">';
+
+    pageNotices.forEach(function (n) {
+      html += '<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:14px;border-bottom:1px solid #F0F1F3;align-items:center;">' +
+        '<div style="min-width:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
+          (n.pinned ? '<span title="상단 고정" aria-label="상단 고정" style="flex:none;font-size:14px;">📌</span>' : '') +
+          (n.tag ? '<span style="flex:none;padding:4px 8px;border-radius:6px;background:#FFF3EC;color:#FF6A3D;font-size:11px;font-weight:800;">' + esc(n.tag) + '</span>' : '') +
+          '<span style="min-width:140px;flex:1;font-size:14px;font-weight:700;color:#14263F;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(n.title) + '</span>' +
           '<span style="flex:none;font-size:12px;color:#8A93A1;font-weight:600;white-space:nowrap;">' + esc(n.date) + '</span>' +
-          '<button data-action="remove-notice" data-id="' + n.id + '" aria-label="삭제" style="' + S.deleteBtn + '">×</button>' +
         '</div>' +
-        '<textarea data-input="notice-field" data-id="' + n.id + '" data-field="body" placeholder="내용" rows="3" style="padding:10px 12px;border-radius:10px;border:1.5px solid #E6E8EC;font-size:13.5px;color:#14263F;width:100%;line-height:1.6;resize:vertical;font-family:inherit;">' + esc(n.body) + '</textarea>' +
+        '<div style="display:flex;align-items:center;gap:6px;">' +
+          '<button data-action="edit-notice" data-id="' + esc(n.id) + '" aria-label="' + esc(n.title) + ' 수정" style="padding:7px 10px;border-radius:8px;border:1px solid #E6E8EC;background:#FFFFFF;color:#4B5563;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">수정</button>' +
+          '<button data-action="request-remove-notice" data-id="' + esc(n.id) + '" aria-label="' + esc(n.title) + ' 삭제" style="padding:7px 10px;border-radius:8px;border:1px solid #F3D9D6;background:#FDF3F2;color:#E0483E;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">삭제</button>' +
+        '</div>' +
       '</div>';
     });
-    if (state.notices.length === 0) {
-      html += '<div style="font-size:13px;color:#8A93A1;padding:8px 0;">등록된 공지사항이 없어요.</div>';
-    }
-    html += '</div>';
 
-    html += '<div style="border-top:1px solid #F0F1F3;padding-top:18px;">' +
-      '<div style="font-size:12.5px;font-weight:700;color:#4B5563;margin-bottom:10px;">새 공지 작성</div>' +
-      '<div style="border:1.5px dashed #D8DCE3;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;">' +
-        '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
-          '<input type="text" data-input="draft-notice-tag" value="' + esc(state.draftNoticeTag) + '" placeholder="태그(선택, 예: 공지)" style="width:160px;flex:none;padding:10px 12px;border-radius:10px;border:1.5px solid #E6E8EC;font-size:13px;color:#14263F;" />' +
-          '<input type="text" data-input="draft-notice-title" value="' + esc(state.draftNoticeTitle) + '" placeholder="제목" style="flex:1;min-width:160px;padding:10px 12px;border-radius:10px;border:1.5px solid #E6E8EC;font-size:14px;color:#14263F;" />' +
+    if (!pageNotices.length) {
+      html += '<div style="padding:28px 18px;text-align:center;font-size:13px;color:#8A93A1;">' + (state.noticeSearch ? '검색 결과가 없어요.' : '등록된 공지사항이 없어요.') + '</div>';
+    }
+    html += '</div>' + renderNoticePagination(totalPages);
+    return html;
+  }
+
+  function updateNoticeListResults() {
+    var target = document.getElementById('notice-list-results');
+    if (target) target.innerHTML = renderNoticeListResults();
+  }
+
+  function renderNoticeList() {
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px;flex-wrap:wrap;">' +
+      '<input type="search" data-input="notice-search" value="' + esc(state.noticeSearch) + '" placeholder="제목 또는 내용 검색" aria-label="공지 검색" style="flex:1;min-width:200px;max-width:440px;' + S.input + '" />' +
+      '<button data-action="new-notice" style="padding:11px 16px;border-radius:11px;border:none;background:#14263F;color:#FFFFFF;font-weight:700;font-size:13.5px;cursor:pointer;font-family:inherit;white-space:nowrap;">+ 새 공지</button>' +
+    '</div>' +
+    '<div id="notice-list-results">' + renderNoticeListResults() + '</div>';
+  }
+
+  function renderNoticeForm() {
+    var editing = state.noticeEditingId !== null;
+    return '<div>' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:18px;flex-wrap:wrap;">' +
+        '<div style="font-size:17px;font-weight:800;color:#14263F;">' + (editing ? '공지 수정' : '새 공지 작성') + '</div>' +
+        '<button data-action="cancel-notice-form" style="padding:8px 4px;border:none;background:none;color:#8A93A1;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">목록으로</button>' +
+      '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:16px;">' +
+        '<label style="display:flex;flex-direction:column;gap:7px;">' +
+          '<span style="font-size:12.5px;font-weight:700;color:#4B5563;">태그 <span style="color:#8A93A1;font-weight:500;">(선택)</span></span>' +
+          '<input type="text" data-input="notice-form-tag" value="' + esc(state.noticeFormTag) + '" placeholder="예: 공지, 이벤트" style="' + S.input + '" />' +
+        '</label>' +
+        '<label style="display:flex;flex-direction:column;gap:7px;">' +
+          '<span style="font-size:12.5px;font-weight:700;color:#4B5563;">제목</span>' +
+          '<input type="text" data-input="notice-form-title" value="' + esc(state.noticeFormTitle) + '" placeholder="제목을 입력해주세요" style="' + S.input + '" />' +
+        '</label>' +
+        '<label style="display:flex;flex-direction:column;gap:7px;">' +
+          '<span style="font-size:12.5px;font-weight:700;color:#4B5563;">내용</span>' +
+          '<textarea data-input="notice-form-body" rows="9" placeholder="내용을 입력해주세요" style="' + S.input + 'line-height:1.7;resize:vertical;font-family:inherit;">' + esc(state.noticeFormBody) + '</textarea>' +
+        '</label>' +
+        '<label style="display:flex;align-items:center;gap:9px;padding:12px 14px;border-radius:11px;background:#F5F6F8;cursor:pointer;">' +
+          '<input type="checkbox" data-input="notice-form-pinned"' + (state.noticeFormPinned ? ' checked' : '') + ' style="width:17px;height:17px;accent-color:#FF6A3D;" />' +
+          '<span style="font-size:13px;font-weight:700;color:#14263F;">상단에 고정할게요</span>' +
+        '</label>' +
+        '<div style="padding:14px;border:1.5px dashed #D8DCE3;border-radius:12px;background:#FAFAFB;">' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;flex-wrap:wrap;">' +
+            '<span style="font-size:12.5px;font-weight:700;color:#4B5563;">첨부파일</span>' +
+            '<span style="padding:3px 7px;border-radius:6px;background:#F0F1F3;color:#8A93A1;font-size:10.5px;font-weight:800;">서버 연동 후 활성화</span>' +
+          '</div>' +
+          '<input type="file" disabled aria-label="첨부파일" style="width:100%;font-size:12.5px;color:#C3C9D2;cursor:not-allowed;" />' +
         '</div>' +
-        '<textarea data-input="draft-notice-body" placeholder="내용을 입력하세요" rows="4" style="padding:10px 12px;border-radius:10px;border:1.5px solid #E6E8EC;font-size:13.5px;color:#14263F;width:100%;line-height:1.6;resize:vertical;font-family:inherit;">' + esc(state.draftNoticeBody) + '</textarea>' +
-        (state.noticeError ? '<div style="font-size:12.5px;color:#E0483E;">' + esc(state.noticeError) + '</div>' : '') +
-        '<button data-action="add-notice" style="' + S.primaryBtn + '">공지 등록하기</button>' +
+        (state.noticeError ? '<div style="font-size:12.5px;color:#E0483E;font-weight:600;">' + esc(state.noticeError) + '</div>' : '') +
+        '<div style="display:flex;gap:9px;">' +
+          '<button data-action="save-notice" style="flex:1;' + S.primaryBtn + '">' + (editing ? '수정 저장' : '등록') + '</button>' +
+          '<button data-action="cancel-notice-form" style="flex:1;padding:12px;border-radius:11px;border:1.5px solid #E6E8EC;background:#FFFFFF;color:#4B5563;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">취소</button>' +
+        '</div>' +
       '</div>' +
     '</div>';
+  }
 
-    return html;
+  function renderNoticeTab() {
+    return state.noticeView === 'form' ? renderNoticeForm() : renderNoticeList();
   }
 
   function renderInquiryTab() {
@@ -362,6 +446,19 @@
     return html;
   }
 
+  function findNoticeById(id) {
+    return state.notices.find(function (n) { return String(n.id) === String(id); });
+  }
+
+  function clearNoticeForm() {
+    state.noticeEditingId = null;
+    state.noticeFormTag = '';
+    state.noticeFormTitle = '';
+    state.noticeFormBody = '';
+    state.noticeFormPinned = false;
+    state.noticeError = '';
+  }
+
   function renderAll() {
     var meta = pageMeta();
     document.getElementById('pageTitle').textContent = meta.title;
@@ -377,11 +474,17 @@
 
     document.getElementById('resetRow').style.display = CATALOG_TABS.indexOf(tab) !== -1 ? '' : 'none';
     document.getElementById('resetModal').style.display = state.showResetConfirm ? 'flex' : 'none';
+    var noticeDeleteModal = document.getElementById('noticeDeleteModal');
+    if (noticeDeleteModal) noticeDeleteModal.style.display = state.noticeDeleteId !== null ? 'flex' : 'none';
   }
 
   // ── 동작 ────────────────────────────────────────────────────
   var actions = {
-    'set-tab': function (el) { state.activeTab = el.dataset.tab; renderAll(); },
+    'set-tab': function (el) {
+      state.activeTab = el.dataset.tab;
+      if (state.activeTab === 'notice') state.noticeView = 'list';
+      renderAll();
+    },
 
     'toggle-enabled': function (el) {
       var s = el.dataset.section;
@@ -435,18 +538,68 @@
       persistCatalog(); renderAll();
     },
 
-    'remove-notice': function (el) {
-      var id = Number(el.dataset.id);
-      state.notices = state.notices.filter(function (n) { return n.id !== id; });
-      persistNotices(); renderAll();
+    'new-notice': function () {
+      clearNoticeForm();
+      state.noticeView = 'form';
+      renderAll();
     },
-    'add-notice': function () {
-      var title = (state.draftNoticeTitle || '').trim();
-      var body = (state.draftNoticeBody || '').trim();
+    'edit-notice': function (el) {
+      var notice = findNoticeById(el.dataset.id);
+      if (!notice) return;
+      state.noticeEditingId = notice.id;
+      state.noticeFormTag = notice.tag || '';
+      state.noticeFormTitle = notice.title || '';
+      state.noticeFormBody = notice.body || '';
+      state.noticeFormPinned = !!notice.pinned;
+      state.noticeError = '';
+      state.noticeView = 'form';
+      renderAll();
+    },
+    'cancel-notice-form': function () {
+      clearNoticeForm();
+      state.noticeView = 'list';
+      renderAll();
+    },
+    'save-notice': function () {
+      var title = (state.noticeFormTitle || '').trim();
+      var body = (state.noticeFormBody || '').trim();
       if (!title) { state.noticeError = '제목을 입력해주세요'; renderAll(); return; }
       if (!body) { state.noticeError = '내용을 입력해주세요'; renderAll(); return; }
-      state.notices.unshift({ id: Date.now(), tag: (state.draftNoticeTag || '').trim(), title: title, date: todayDateStr(), body: body });
-      state.draftNoticeTag = ''; state.draftNoticeTitle = ''; state.draftNoticeBody = ''; state.noticeError = '';
+      if (state.noticeEditingId !== null) {
+        var editingNotice = findNoticeById(state.noticeEditingId);
+        if (!editingNotice) { clearNoticeForm(); state.noticeView = 'list'; renderAll(); return; }
+        editingNotice.tag = (state.noticeFormTag || '').trim();
+        editingNotice.title = title;
+        editingNotice.body = body;
+        editingNotice.pinned = !!state.noticeFormPinned;
+      } else {
+        state.notices.unshift({
+          id: Date.now(), tag: (state.noticeFormTag || '').trim(), title: title,
+          date: todayDateStr(), body: body, pinned: !!state.noticeFormPinned,
+        });
+        state.noticeSearch = '';
+        state.noticePage = 1;
+      }
+      clearNoticeForm();
+      state.noticeView = 'list';
+      persistNotices(); renderAll();
+    },
+    'notice-page': function (el) {
+      state.noticePage = Math.max(1, Number(el.dataset.page) || 1);
+      updateNoticeListResults();
+    },
+    'request-remove-notice': function (el) {
+      state.noticeDeleteId = el.dataset.id;
+      renderAll();
+    },
+    'cancel-remove-notice': function () {
+      state.noticeDeleteId = null;
+      renderAll();
+    },
+    'confirm-remove-notice': function () {
+      var deleteId = state.noticeDeleteId;
+      state.notices = state.notices.filter(function (n) { return String(n.id) !== String(deleteId); });
+      state.noticeDeleteId = null;
       persistNotices(); renderAll();
     },
 
@@ -503,21 +656,20 @@
       state.discountConfig[section].value = nonNegFloat(v);
       persistDiscount();
       updateDiscountDynamicText();
-    } else if (kind === 'notice-field') {
-      var id = Number(el.dataset.id);
-      var n = state.notices.find(function (x) { return x.id === id; });
-      if (!n) return;
-      n[el.dataset.field] = v;
-      persistNotices();
+    } else if (kind === 'notice-search') {
+      state.noticeSearch = v;
+      state.noticePage = 1;
+      updateNoticeListResults();
     } else if (kind === 'answer-draft') {
       state.answerDrafts[Number(el.dataset.id)] = v;
     } else if (kind === 'draft-name') { state.draftName = v; state.draftError = ''; }
     else if (kind === 'draft-desc') { state.draftDesc = v; }
     else if (kind === 'draft-price') { state.draftPrice = v; state.draftError = ''; }
     else if (kind === 'draft-keyword') { state.draftKeyword = v; }
-    else if (kind === 'draft-notice-tag') { state.draftNoticeTag = v; }
-    else if (kind === 'draft-notice-title') { state.draftNoticeTitle = v; state.noticeError = ''; }
-    else if (kind === 'draft-notice-body') { state.draftNoticeBody = v; state.noticeError = ''; }
+    else if (kind === 'notice-form-tag') { state.noticeFormTag = v; }
+    else if (kind === 'notice-form-title') { state.noticeFormTitle = v; state.noticeError = ''; }
+    else if (kind === 'notice-form-body') { state.noticeFormBody = v; state.noticeError = ''; }
+    else if (kind === 'notice-form-pinned') { state.noticeFormPinned = el.checked; }
   });
 
   document.getElementById('logoutBtn').addEventListener('click', function () {

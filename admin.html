@@ -59,6 +59,19 @@
   </div>
 </div>
 
+<div id="noticeDeleteModal" style="display:none;position:fixed;inset:0;z-index:80;background:rgba(20,38,63,.45);align-items:center;justify-content:center;padding:20px;">
+  <div style="animation:jstFadeIn .18s ease both;width:min(92vw,360px);background:#FFFFFF;border-radius:18px;padding:24px;display:flex;flex-direction:column;gap:16px;">
+    <div>
+      <div style="font-size:16px;font-weight:800;color:#14263F;margin-bottom:6px;">이 공지를 삭제할까요?</div>
+      <div style="font-size:13.5px;color:#4B5563;line-height:1.6;">삭제한 공지는 다시 되돌릴 수 없어요.</div>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button data-action="cancel-remove-notice" style="flex:1;padding:12px;border-radius:11px;border:1.5px solid #E6E8EC;background:#FFFFFF;color:#14263F;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">취소</button>
+      <button data-action="confirm-remove-notice" style="flex:1;padding:12px;border-radius:11px;border:none;background:#E0483E;color:#FFFFFF;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">삭제</button>
+    </div>
+  </div>
+</div>
+
 <script src="js/store.js"></script>
 <script src="js/admin.js"></script>
 </body>
