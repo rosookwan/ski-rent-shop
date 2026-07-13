@@ -119,11 +119,11 @@ window.JSTStore = (function () {
   function defaultInquiries() {
     return [
       { id: 1, title: '숙박 문의드립니다', date: '2026.07.10', status: '답변완료', secret: false, name: '', contact: '', email: '', content: '무주리조트 근처에서 2박 묵을 숙소를 찾고 있어요. 4인 가족 기준으로 추천 부탁드려요.', answer: '안녕하세요, 문의주셔서 감사합니다. 원하시는 일정에 맞는 숙소를 안내해드렸어요.' },
-      { id: 2, title: '렌탈 사이즈 관련 문의', date: '2026.07.09', status: '답변대기', secret: true, name: '', contact: '', email: '', content: '', answer: '' },
+      { id: 2, title: '렌탈 사이즈 관련 문의', date: '2026.07.09', status: '답변대기', secret: true, password: '1234', name: '', contact: '', email: '', content: '', answer: '' },
       { id: 3, title: '리프트권 단체 할인 문의', date: '2026.07.06', status: '답변완료', secret: false, name: '', contact: '', email: '', content: '20명 단체로 방문 예정인데 리프트권 할인이 가능한가요?', answer: '단체 인원 기준 할인 안내를 답변드렸습니다.' },
       { id: 4, title: '주차 가능 여부 문의', date: '2026.07.02', status: '답변완료', secret: false, name: '', contact: '', email: '', content: '방문객 주차 공간이 따로 있는지 궁금합니다.', answer: '네, 방문객 전용 주차공간이 마련되어 있습니다.' },
       { id: 5, title: '초보자 강습 문의', date: '2026.06.28', status: '답변대기', secret: false, name: '', contact: '', email: '', content: '스키가 처음인데 강습 프로그램이 있을까요?', answer: '' },
-      { id: 6, title: '예약 변경 문의', date: '2026.06.25', status: '답변완료', secret: true, name: '', contact: '', email: '', content: '', answer: '예약 변경 처리해드렸습니다.' },
+      { id: 6, title: '예약 변경 문의', date: '2026.06.25', status: '답변완료', secret: true, password: '1234', name: '', contact: '', email: '', content: '', answer: '예약 변경 처리해드렸습니다.' },
     ];
   }
 
@@ -143,6 +143,12 @@ window.JSTStore = (function () {
 
   function loadInquiries() { return loadRaw(KEYS.inquiries, defaultInquiries(), Array.isArray); }
   function saveInquiries(inquiries) { saveRaw(KEYS.inquiries, inquiries); }
+  function verifyInquiryPassword(id, password) {
+    var provided = String(password || '');
+    if (!provided) return false;
+    var inquiry = loadInquiries().find(function (item) { return String(item.id) === String(id); });
+    return !!inquiry && !!inquiry.secret && String(inquiry.password || '') === provided;
+  }
 
   /** 셀프견적 → 문의게시판 전달 페이로드 */
   function loadEstimate() { return loadRaw(KEYS.estimate, null); }
@@ -174,7 +180,7 @@ window.JSTStore = (function () {
     loadCatalog: loadCatalog, saveCatalog: saveCatalog,
     loadDiscountConfig: loadDiscountConfig, saveDiscountConfig: saveDiscountConfig,
     loadNotices: loadNotices, saveNotices: saveNotices,
-    loadInquiries: loadInquiries, saveInquiries: saveInquiries,
+    loadInquiries: loadInquiries, saveInquiries: saveInquiries, verifyInquiryPassword: verifyInquiryPassword,
     loadEstimate: loadEstimate, saveEstimate: saveEstimate,
     loadTripInfo: loadTripInfo, saveTripInfo: saveTripInfo,
     hasAdminSession: hasAdminSession, setAdminSession: setAdminSession, clearAdminSession: clearAdminSession,

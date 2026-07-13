@@ -15,7 +15,8 @@
   }
 
   var state = Object.assign({
-    activeTab: 'list', selectedId: null,
+    activeTab: 'list', selectedId: null, page: 1,
+    viewPassword: '', viewPasswordError: '', unlockedInquiryIds: {},
     discountConfig: JST.loadDiscountConfig(),
     catalog: JST.loadCatalog(),
     inquiries: JST.loadInquiries(),
@@ -72,6 +73,7 @@
   }
 
   function submit() {
+    if (!state.name.trim()) { state.formError = '이름을 입력해주세요'; render(); return; }
     if (!state.title.trim()) { state.formError = '제목을 입력해주세요'; render(); return; }
     if (!state.fromEstimate && !state.content.trim()) { state.formError = '내용을 입력해주세요'; render(); return; }
     if (state.secretChecked && !state.password.trim()) { state.formError = '비밀글 비밀번호를 입력해주세요'; render(); return; }
@@ -98,6 +100,7 @@
     };
     state.inquiries = [record].concat(state.inquiries);
     JST.saveInquiries(state.inquiries);
+    state.page = 1;
     state.submitted = true;
     state.formError = '';
     render();
@@ -109,6 +112,32 @@
     var done = status === '답변완료';
     return '<span style="flex:none;padding:' + (pad || '3px 9px') + ';border-radius:6px;font-size:11.5px;font-weight:800;background:' +
       (done ? '#E9F7EF' : '#F0F1F3') + ';color:' + (done ? '#1F9254' : '#6B7280') + ';">' + esc(status) + '</span>';
+  }
+
+  function findInquiryById(id) {
+    return state.inquiries.find(function (q) { return String(q.id) === String(id); });
+  }
+
+  function maskName(name) {
+    var chars = Array.from(String(name || '').trim());
+    if (chars.length <= 1) return chars.join('');
+    if (chars.length === 2) return chars[0] + '*';
+    return chars[0] + '*'.repeat(chars.length - 2) + chars[chars.length - 1];
+  }
+
+  function renderPagination(totalPages) {
+    if (totalPages <= 1) return '';
+    var start = Math.max(1, Math.min(state.page - 2, totalPages - 4));
+    var end = Math.min(totalPages, start + 4);
+    var html = '<div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:16px;flex-wrap:wrap;">' +
+      '<button data-action="inquiry-page" data-page="' + Math.max(1, state.page - 1) + '"' + (state.page === 1 ? ' disabled' : '') + ' aria-label="이전 페이지" style="width:36px;height:36px;border-radius:9px;border:1px solid #E6E8EC;background:#FFFFFF;color:#4B5563;font-weight:800;cursor:' + (state.page === 1 ? 'not-allowed' : 'pointer') + ';opacity:' + (state.page === 1 ? '.42' : '1') + ';font-family:inherit;">◀</button>';
+    for (var page = start; page <= end; page++) {
+      var active = page === state.page;
+      html += '<button data-action="inquiry-page" data-page="' + page + '"' + (active ? ' aria-current="page"' : '') + ' style="width:36px;height:36px;border-radius:9px;border:' + (active ? 'none' : '1px solid #E6E8EC') + ';background:' + (active ? '#14263F' : '#FFFFFF') + ';color:' + (active ? '#FFFFFF' : '#4B5563') + ';font-weight:800;cursor:pointer;font-family:inherit;">' + page + '</button>';
+    }
+    html += '<button data-action="inquiry-page" data-page="' + Math.min(totalPages, state.page + 1) + '"' + (state.page === totalPages ? ' disabled' : '') + ' aria-label="다음 페이지" style="width:36px;height:36px;border-radius:9px;border:1px solid #E6E8EC;background:#FFFFFF;color:#4B5563;font-weight:800;cursor:' + (state.page === totalPages ? 'not-allowed' : 'pointer') + ';opacity:' + (state.page === totalPages ? '.42' : '1') + ';font-family:inherit;">▶</button>' +
+    '</div>';
+    return html;
   }
 
   function renderTabs() {
@@ -125,31 +154,36 @@
   }
 
   function renderList() {
+    var totalPages = Math.max(1, Math.ceil(state.inquiries.length / 10));
+    state.page = Math.max(1, Math.min(state.page, totalPages));
+    var pageInquiries = state.inquiries.slice((state.page - 1) * 10, state.page * 10);
     var html = '<div style="background:#FFFFFF;border:1px solid #E6E8EC;border-radius:18px;overflow:hidden;">';
-    state.inquiries.forEach(function (q) {
+    pageInquiries.forEach(function (q) {
+      var maskedName = maskName(q.name);
       html += '<button data-action="open" data-id="' + esc(q.id) + '" style="width:100%;display:flex;align-items:center;gap:10px;padding:16px clamp(14px,3vw,20px);background:none;border:none;border-bottom:1px solid #F0F1F3;cursor:pointer;text-align:left;font-family:inherit;">' +
         (q.secret ? '<span style="flex:none;font-size:13px;">🔒</span>' : '') +
-        '<span style="flex:1;min-width:0;font-size:14.5px;color:#14263F;font-weight:700;">' + esc(q.title) + '</span>' +
+        '<span style="flex:1;min-width:0;">' +
+          '<span style="display:block;font-size:14.5px;color:#14263F;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(q.title) + '</span>' +
+          (maskedName ? '<span style="display:block;margin-top:3px;font-size:11.5px;color:#8A93A1;font-weight:600;">' + esc(maskedName) + '</span>' : '') +
+        '</span>' +
         statusBadge(q.status) +
         '<span style="flex:none;font-size:12.5px;color:#8A93A1;">' + esc(q.date) + '</span>' +
         '<span style="flex:none;color:#C3C9D2;font-size:15px;">›</span>' +
       '</button>';
     });
-    if (state.inquiries.length === 0) {
+    if (pageInquiries.length === 0) {
       html += '<div style="padding:24px;text-align:center;font-size:13px;color:#8A93A1;">등록된 문의가 없어요.</div>';
     }
-    html += '</div>';
+    html += '</div>' + renderPagination(totalPages);
     return html;
   }
 
   function renderDetail() {
-    var q = null;
-    state.inquiries.forEach(function (x) { if (x.id === state.selectedId) q = x; });
+    var q = findInquiryById(state.selectedId);
     if (!q) q = { title: '', date: '', status: '', secret: false, content: '', answer: '' };
-    var bodyText = q.secret
-      ? '비밀글로 등록된 문의입니다. 작성자만 확인할 수 있어요.'
-      : ((q.content && q.content.trim()) ? q.content : '등록된 문의 내용이 없어요.');
-    var hasAnswer = !q.secret && !!(q.answer && q.answer.trim());
+    var bodyText = (q.content && q.content.trim()) ? q.content : '등록된 문의 내용이 없어요.';
+    var hasAnswer = !!(q.answer && q.answer.trim());
+    var maskedName = maskName(q.name);
     var html =
       '<button data-action="back" style="display:inline-flex;align-items:center;gap:6px;padding:9px 4px;margin-bottom:16px;background:none;border:none;color:#4B5563;font-weight:700;font-size:13.5px;cursor:pointer;font-family:inherit;">‹ 목록으로</button>' +
       '<div style="background:#FFFFFF;border:1px solid #E6E8EC;border-radius:18px;padding:clamp(20px,5vw,32px);">' +
@@ -158,7 +192,7 @@
           (q.secret ? '<span style="font-size:13px;">🔒 비밀글</span>' : '') +
         '</div>' +
         '<h1 style="margin:0 0 10px;font-size:clamp(19px,4.5vw,24px);font-weight:800;color:#14263F;letter-spacing:-0.02em;">' + esc(q.title) + '</h1>' +
-        '<div style="font-size:13px;color:#8A93A1;font-weight:600;margin-bottom:20px;">' + esc(q.date) + '</div>' +
+        '<div style="font-size:13px;color:#8A93A1;font-weight:600;margin-bottom:20px;">' + esc(q.date) + (maskedName ? ' · 작성자 ' + esc(maskedName) : '') + '</div>' +
         '<div style="height:1px;background:#F0F1F3;margin-bottom:20px;"></div>' +
         '<p style="margin:0;font-size:15px;line-height:1.8;color:#374151;white-space:pre-wrap;">' + esc(bodyText) + '</p>';
     if (hasAnswer) {
@@ -170,6 +204,27 @@
     html += '</div>' +
       '<button data-action="back" style="margin-top:16px;padding:12px 20px;border-radius:11px;border:1.5px solid #E6E8EC;background:#FFFFFF;color:#14263F;font-weight:700;font-size:13.5px;cursor:pointer;font-family:inherit;">목록으로 돌아가기</button>';
     return html;
+  }
+
+  function renderPasswordPrompt() {
+    var q = findInquiryById(state.selectedId);
+    if (!q) return renderDetail();
+    var maskedName = maskName(q.name);
+    return '<button data-action="back" style="display:inline-flex;align-items:center;gap:6px;padding:9px 4px;margin-bottom:16px;background:none;border:none;color:#4B5563;font-weight:700;font-size:13.5px;cursor:pointer;font-family:inherit;">‹ 목록으로</button>' +
+      '<div style="background:#FFFFFF;border:1px solid #E6E8EC;border-radius:18px;padding:clamp(20px,5vw,32px);">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">' + statusBadge(q.status, '4px 9px') + '<span style="font-size:13px;">🔒 비밀글</span></div>' +
+        '<h1 style="margin:0 0 10px;font-size:clamp(19px,4.5vw,24px);font-weight:800;color:#14263F;letter-spacing:-0.02em;">' + esc(q.title) + '</h1>' +
+        '<div style="font-size:13px;color:#8A93A1;font-weight:600;margin-bottom:22px;">' + esc(q.date) + (maskedName ? ' · 작성자 ' + esc(maskedName) : '') + '</div>' +
+        '<div style="padding:18px;border-radius:14px;background:#F5F6F8;">' +
+          '<div style="font-size:15px;font-weight:800;color:#14263F;margin-bottom:6px;">비밀글이에요</div>' +
+          '<p style="margin:0 0 14px;font-size:13.5px;color:#4B5563;line-height:1.6;">작성할 때 설정한 비밀번호를 입력해주세요.</p>' +
+          '<div style="display:flex;gap:8px;max-width:360px;">' +
+            '<input type="password" data-input="view-password" value="' + esc(state.viewPassword) + '" placeholder="비밀번호" aria-label="비밀글 비밀번호" style="flex:1;min-width:0;padding:11px 12px;border-radius:10px;border:1.5px solid #E6E8EC;font-size:14px;color:#14263F;font-family:inherit;" />' +
+            '<button data-action="verify-password" style="flex:none;padding:11px 17px;border-radius:10px;border:none;background:#14263F;color:#FFFFFF;font-weight:700;font-size:13.5px;cursor:pointer;font-family:inherit;">확인</button>' +
+          '</div>' +
+          (state.viewPasswordError ? '<div style="margin-top:9px;font-size:12.5px;color:#E0483E;font-weight:600;">' + esc(state.viewPasswordError) + '</div>' : '') +
+        '</div>' +
+      '</div>';
   }
 
   function renderEstimateBox() {
@@ -271,7 +326,7 @@
       renderEstimateBox() +
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">' +
         '<div style="display:flex;flex-direction:column;gap:6px;">' +
-          '<label style="font-size:12.5px;font-weight:700;color:#4B5563;">이름</label>' +
+          '<label style="font-size:12.5px;font-weight:700;color:#4B5563;">이름 <span style="color:#E85425;">*</span></label>' +
           '<input type="text" data-input="name" value="' + esc(state.name) + '" placeholder="이름을 알려주세요" style="' + inputStyle + '" />' +
         '</div>' +
         '<div style="display:flex;flex-direction:column;gap:6px;">' +
@@ -310,24 +365,40 @@
   function render() {
     var app = document.getElementById('app');
     var html = renderTabs();
-    if (state.selectedId !== null) html += renderDetail();
+    var selected = state.selectedId !== null ? findInquiryById(state.selectedId) : null;
+    var unlocked = selected && state.unlockedInquiryIds[String(selected.id)];
+    if (selected && selected.secret && !unlocked) html += renderPasswordPrompt();
+    else if (state.selectedId !== null) html += renderDetail();
     else if (state.activeTab === 'write') html += renderWrite();
     else html += renderList();
     app.innerHTML = html;
   }
 
   var actions = {
-    'set-tab-list': function () { state.activeTab = 'list'; state.selectedId = null; render(); },
+    'set-tab-list': function () { state.activeTab = 'list'; state.selectedId = null; state.viewPassword = ''; state.viewPasswordError = ''; render(); },
     'set-tab-write': function () { state.activeTab = 'write'; render(); },
     'open': function (el) {
       var v = Number(el.dataset.id);
       state.selectedId = isNaN(v) ? el.dataset.id : v;
+      state.viewPassword = '';
+      state.viewPasswordError = '';
       render(); window.scrollTo(0, 0);
     },
-    'back': function () { state.selectedId = null; render(); },
+    'back': function () { state.selectedId = null; state.viewPassword = ''; state.viewPasswordError = ''; render(); },
+    'verify-password': function () {
+      if (JST.verifyInquiryPassword(state.selectedId, state.viewPassword.trim())) {
+        state.unlockedInquiryIds[String(state.selectedId)] = true;
+        state.viewPassword = '';
+        state.viewPasswordError = '';
+      } else {
+        state.viewPasswordError = '비밀번호가 일치하지 않아요';
+      }
+      render();
+    },
+    'inquiry-page': function (el) { state.page = Math.max(1, Number(el.dataset.page) || 1); render(); window.scrollTo(0, 0); },
     'submit': function () { submit(); },
     'back-from-submit': function () {
-      Object.assign(state, defaultFormState(), { activeTab: 'list', selectedId: null });
+      Object.assign(state, defaultFormState(), { activeTab: 'list', selectedId: null, page: 1 });
       render();
     },
   };
@@ -341,12 +412,13 @@
     var el = e.target.closest('[data-input]');
     if (!el) return;
     var k = el.dataset.input;
-    if (k === 'name') state.name = el.value;
+    if (k === 'name') { state.name = el.value; state.formError = ''; }
     else if (k === 'contact') state.contact = el.value;
     else if (k === 'email') state.email = el.value;
     else if (k === 'title') { state.title = el.value; state.formError = ''; }
     else if (k === 'content') { state.content = el.value; state.formError = ''; }
     else if (k === 'password') { state.password = el.value; state.formError = ''; }
+    else if (k === 'view-password') { state.viewPassword = el.value; state.viewPasswordError = ''; }
   });
 
   document.getElementById('app').addEventListener('change', function (e) {
