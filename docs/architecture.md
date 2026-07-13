@@ -112,3 +112,21 @@ document.getElementById('app').addEventListener('click', function (e) {
 - `jst_trip_info`/`jst_estimate` 같은 페이지 간 전달 데이터는 서버로 옮기지 않고
   localStorage(또는 sessionStorage)에 남겨도 된다 — 같은 브라우저 안의 전달이므로.
 - 테이블 설계 초안은 docs/development-plan.md §7 참고.
+
+### 확정된 목표 구조
+
+```
+브라우저(기존 HTML/JS)
+  ├─ JSTStore API 대상: 공지 · 문의 · 품목 · 할인 · 관리자 인증 · 첨부
+  └─ localStorage 유지: 일정 전달 · 견적 전달 · 견적 임시저장
+            │ HTTPS / JSON
+            ▼
+Nginx ── FastAPI(systemd, 전용 사용자) ── SQLite
+                    │
+                    └─ 공지 첨부 전용 디렉터리
+```
+
+- 배포 대상은 기존 Vultr 서버(1 vCPU, RAM 2 GB, SSD 55 GB)다.
+- 백엔드와 데이터는 테니스 웹·알림 봇의 사용자 및 디렉터리와 분리한다.
+- SQLite 접근 코드는 저장소 계층에 모아 향후 PostgreSQL 전환 범위를 제한한다.
+- 상세 단계와 완료 기준은 `docs/requirements/M3-backend-migration.md`를 따른다.
