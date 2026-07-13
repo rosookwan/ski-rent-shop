@@ -160,3 +160,78 @@ class InquiryDetail(InquirySummary):
 
 class InquiryPassword(StrictModel):
     password: str = Field(min_length=1, max_length=64)
+
+
+class AdminLogin(StrictModel):
+    loginId: str = Field(min_length=1, max_length=80)
+    password: str = Field(min_length=1, max_length=128)
+
+
+class AdminSessionOut(StrictModel):
+    loginId: str
+    expiresAt: str
+
+
+class AdminNoticeInput(StrictModel):
+    tag: str = Field(default="공지", max_length=30)
+    title: str = Field(min_length=1, max_length=120)
+    body: str = Field(min_length=1, max_length=20_000)
+    pinned: bool = False
+
+
+class AdminInquiryOut(StrictModel):
+    id: int
+    title: str
+    content: str
+    name: str
+    contact: str
+    email: str
+    secret: bool
+    status: Literal["답변대기", "답변완료"]
+    answer: str
+    estimate: EstimatePayload | None
+    date: str
+    answeredAt: str | None
+
+
+class AdminInquiryPage(StrictModel):
+    items: list[AdminInquiryOut]
+    page: int
+    pageSize: int
+    total: int
+    totalPages: int
+
+
+class AdminInquiryUpdate(StrictModel):
+    answer: str = Field(default="", max_length=20_000)
+    status: Literal["답변대기", "답변완료"]
+
+
+class AdminCatalogItemInput(StrictModel):
+    id: str = Field(min_length=1, max_length=100, pattern=r"^[A-Za-z0-9_-]+$")
+    name: str = Field(min_length=1, max_length=100)
+    desc: str = Field(default="", max_length=500)
+    price: int = Field(ge=0, le=100_000_000)
+    discountGeneral: int = Field(default=0, ge=0, le=100_000_000)
+    discountAffiliate: int = Field(default=0, ge=0, le=100_000_000)
+    hidden: bool = False
+
+
+class AdminCatalogItemUpdate(StrictModel):
+    name: str = Field(min_length=1, max_length=100)
+    desc: str = Field(default="", max_length=500)
+    price: int = Field(ge=0, le=100_000_000)
+    discountGeneral: int = Field(default=0, ge=0, le=100_000_000)
+    discountAffiliate: int = Field(default=0, ge=0, le=100_000_000)
+    hidden: bool = False
+
+
+class AdminCatalogOrder(StrictModel):
+    itemIds: list[str] = Field(min_length=1, max_length=500)
+
+    @field_validator("itemIds")
+    @classmethod
+    def validate_unique_ids(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("품목 ID가 중복되었습니다.")
+        return value

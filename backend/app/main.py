@@ -11,6 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from .admin_api import router as admin_api_router
 from .api import router as public_api_router
 from .config import Settings
 from .database import MigrationError, check_database, initialize_database
@@ -36,6 +37,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = resolved_settings
     app.include_router(public_api_router)
+    app.include_router(admin_api_router)
 
     if resolved_settings.allowed_origins:
         app.add_middleware(
