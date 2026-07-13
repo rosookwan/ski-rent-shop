@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>셀프견적 · 준스키타운</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<style>
+  *{box-sizing:border-box;}
+  body{margin:0;background:#F5F6F8;font-family:'Pretendard',-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;word-break:keep-all;-webkit-font-smoothing:antialiased;}
+  input{outline:none;font-family:inherit;}
+  input:focus{border-color:#FF6A3D !important;}
+  @keyframes jstFadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+</style>
+</head>
+<body>
+
+<div id="siteHeader"></div>
+
+<main style="max-width:1200px;margin:0 auto;padding:28px clamp(16px,4vw,32px) 12px;">
+  <div style="margin-bottom:20px;">
+    <div style="font-size:12.5px;font-weight:800;letter-spacing:.06em;color:#FF6A3D;text-transform:uppercase;margin-bottom:8px;">SELF ESTIMATE</div>
+    <h1 style="margin:0 0 8px;font-size:clamp(24px,5vw,32px);font-weight:800;color:#14263F;letter-spacing:-0.02em;">셀프견적</h1>
+    <p style="margin:0;font-size:15px;line-height:1.65;color:#4B5563;max-width:560px;">일정과 인원부터 골라보세요. 필요한 만큼만 담으면 바로 견적이 정리돼요.</p>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px;">
+    <a href="#sec-trip" style="flex:none;white-space:nowrap;padding:8px 14px;border-radius:999px;background:#FFFFFF;border:1px solid #E6E8EC;color:#4B5563;font-weight:700;font-size:13px;text-decoration:none;">1 여행 정보</a>
+    <a href="#sec-lift" style="flex:none;white-space:nowrap;padding:8px 14px;border-radius:999px;background:#FFFFFF;border:1px solid #E6E8EC;color:#4B5563;font-weight:700;font-size:13px;text-decoration:none;">2 리프트권</a>
+    <a href="#sec-rental" style="flex:none;white-space:nowrap;padding:8px 14px;border-radius:999px;background:#FFFFFF;border:1px solid #E6E8EC;color:#4B5563;font-weight:700;font-size:13px;text-decoration:none;">3 렌탈 품목</a>
+  </div>
+
+  <div style="display:flex;gap:28px;align-items:flex-start;">
+    <div style="flex:1;min-width:0;">
+      <section id="sec-trip" style="scroll-margin-top:140px;background:#FFFFFF;border:1px solid #E6E8EC;border-radius:20px;padding:clamp(18px,4vw,28px);margin-bottom:20px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+          <span style="width:28px;height:28px;border-radius:999px;background:#FFF3EC;color:#FF6A3D;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;flex:none;">1</span>
+          <h2 style="margin:0;font-size:19px;font-weight:800;color:#14263F;">여행 정보</h2>
+        </div>
+        <div id="tripSection"></div>
+      </section>
+
+      <section id="sec-lift" style="scroll-margin-top:140px;background:#FFFFFF;border:1px solid #E6E8EC;border-radius:20px;padding:clamp(18px,4vw,28px);margin-bottom:20px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+          <span style="width:28px;height:28px;border-radius:999px;background:#FFF3EC;color:#FF6A3D;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;flex:none;">2</span>
+          <h2 style="margin:0;font-size:19px;font-weight:800;color:#14263F;">리프트권</h2>
+        </div>
+        <div id="liftSection"></div>
+      </section>
+
+      <section id="sec-rental" style="scroll-margin-top:140px;background:#FFFFFF;border:1px solid #E6E8EC;border-radius:20px;padding:clamp(18px,4vw,28px);margin-bottom:20px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+          <span style="width:28px;height:28px;border-radius:999px;background:#FFF3EC;color:#FF6A3D;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;flex:none;">3</span>
+          <h2 style="margin:0;font-size:19px;font-weight:800;color:#14263F;">렌탈 품목</h2>
+        </div>
+        <div id="rentalSection"></div>
+      </section>
+    </div>
+
+    <div id="sidebar"></div>
+  </div>
+</main>
+
+<div id="mobileBar"></div>
+<div id="siteFooter"></div>
+<div id="modals"></div>
+
+<script src="site.js"></script>
+<script src="estimate.js"></script>
+</body>
+</html>
