@@ -92,15 +92,49 @@
     }).join('');
   }
 
-  function generalHelperText(d) {
-    return d.general.type === 'percent'
-      ? '견적 금액의 ' + d.general.value + '%가 할인돼요.'
-      : '품목별로 따로 정하지 않으면 1개당 ' + Math.round(d.general.value).toLocaleString('ko-KR') + '원씩 할인돼요. 특정 품목만 다르게 하려면 아래 리프트권·장비·의류·안전장비 탭에서 품목별로 설정하세요.';
+  function discountLabel(section) {
+    var cfg = state.discountConfig[section];
+    var name = section === 'general' ? '기본' : '제휴';
+    if (!cfg.enabled) return name + ' 할인 사용 안 함';
+    var value = cfg.type === 'percent'
+      ? cfg.value + '%'
+      : Math.round(cfg.value).toLocaleString('ko-KR') + '원';
+    return name + ' ' + value + ' 할인';
   }
-  function affiliateHelperText(d) {
-    return d.affiliate.type === 'percent'
-      ? '견적 금액의 ' + d.affiliate.value + '%가 할인돼요.'
-      : '품목별로 따로 정하지 않으면 1개당 ' + Math.round(d.affiliate.value).toLocaleString('ko-KR') + '원씩 할인돼요. 특정 품목만 다르게 하려면 아래 리프트권·장비·의류·안전장비 탭에서 품목별로 설정하세요.';
+
+  function discountSummaryText() {
+    return '현재 적용 — ' + discountLabel('general') + ' · ' + discountLabel('affiliate');
+  }
+
+  function firstCatalogItem() {
+    for (var i = 0; i < CATALOG_TABS.length; i++) {
+      var items = state.catalog[CATALOG_TABS[i]] || [];
+      if (items.length) return items[0];
+    }
+    return null;
+  }
+
+  function discountPreviewText(section) {
+    var cfg = state.discountConfig[section];
+    if (!cfg.enabled) return '할인을 켜면 적용 예시를 확인할 수 있어요.';
+    if (cfg.type === 'fixed') {
+      return '1개당 ' + Math.round(cfg.value).toLocaleString('ko-KR') + '원씩 할인돼요.';
+    }
+    var item = firstCatalogItem();
+    if (!item) return '품목을 등록하면 적용 예시를 확인할 수 있어요.';
+    var price = Math.max(0, Number(item.price) || 0);
+    var discountAmount = Math.round(price * ((Number(cfg.value) || 0) / 100));
+    discountAmount = Math.max(0, Math.min(price, discountAmount));
+    return item.name + ' ' + JSTStore.won(price) + ' → ' + JSTStore.won(price - discountAmount);
+  }
+
+  function updateDiscountDynamicText() {
+    var summary = document.getElementById('discount-summary');
+    if (summary) summary.textContent = discountSummaryText();
+    ['general', 'affiliate'].forEach(function (section) {
+      var preview = document.getElementById('preview-' + section);
+      if (preview) preview.textContent = discountPreviewText(section);
+    });
   }
 
   function renderDiscountSection(section) {
@@ -111,26 +145,70 @@
     var descText = isGeneral
       ? '제휴 키워드와 일치하지 않는 모든 셀프견적 문의에 기본으로 적용돼요.'
       : "아래 제휴 키워드와 일치하면 기본 할인 대신 이 할인이 적용되고, 상품 금액 옆에 '제휴 할인가'로 표시돼요.";
-    var html = '<div>' +
-      '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;">' +
-        '<div style="font-size:15px;font-weight:800;color:#14263F;">' + title + '</div>' +
-        '<button data-action="toggle-enabled" data-section="' + section + '" style="' + (cfg.enabled ? S.pillOn : S.pillOff) + '">' + (cfg.enabled ? '사용 중' : '사용 안 함') + '</button>' +
+    var disabled = cfg.enabled ? '' : ' disabled';
+    var html = '<div style="border:1px solid #E6E8EC;border-radius:14px;padding:16px;">' +
+      '<div style="font-size:15px;font-weight:800;color:#14263F;margin-bottom:5px;">' + title + '</div>' +
+      '<p style="margin:0 0 14px;font-size:12.5px;color:#8A93A1;line-height:1.6;">' + descText + '</p>' +
+      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+        '<button data-action="toggle-enabled" data-section="' + section + '" aria-pressed="' + cfg.enabled + '" style="' + (cfg.enabled ? S.pillOn : S.pillOff) + '">' + (cfg.enabled ? 'ON' : 'OFF') + '</button>' +
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;opacity:' + (cfg.enabled ? '1' : '.42') + ';">' +
+          '<button data-action="set-disc-type" data-section="' + section + '" data-type="percent"' + disabled + ' style="' + (cfg.type === 'percent' ? S.typeOn : S.typeOff) + (cfg.enabled ? '' : 'cursor:not-allowed;') + '">' + (cfg.type === 'percent' ? '●' : '○') + ' 퍼센트</button>' +
+          '<button data-action="set-disc-type" data-section="' + section + '" data-type="fixed"' + disabled + ' style="' + (cfg.type === 'fixed' ? S.typeOn : S.typeOff) + (cfg.enabled ? '' : 'cursor:not-allowed;') + '">' + (cfg.type === 'fixed' ? '●' : '○') + ' 정액</button>' +
+          '<div style="display:flex;align-items:center;gap:7px;width:150px;max-width:100%;">' +
+            '<input type="number" min="0" data-input="disc-value" data-section="' + section + '" value="' + esc(cfg.value) + '"' + disabled + ' aria-label="' + title + ' 값" style="flex:1;min-width:0;' + S.input + (cfg.enabled ? '' : 'cursor:not-allowed;background:#F5F6F8;') + '" />' +
+            '<span style="flex:none;font-size:13px;color:#8A93A1;font-weight:700;">' + (cfg.type === 'percent' ? '%' : '원') + '</span>' +
+          '</div>' +
+        '</div>' +
       '</div>' +
-      '<p style="margin:0 0 14px;font-size:12.5px;color:#8A93A1;line-height:1.6;">' + descText + '</p>';
-    if (cfg.enabled) {
-      html +=
-        '<div style="display:flex;gap:8px;margin-bottom:10px;">' +
-          '<button data-action="set-disc-type" data-section="' + section + '" data-type="percent" style="' + (cfg.type === 'percent' ? S.typeOn : S.typeOff) + '">퍼센트 할인 (%)</button>' +
-          '<button data-action="set-disc-type" data-section="' + section + '" data-type="fixed" style="' + (cfg.type === 'fixed' ? S.typeOn : S.typeOff) + '">정액 할인 (원)</button>' +
-        '</div>' +
-        '<div style="display:flex;align-items:center;gap:8px;max-width:220px;">' +
-          '<input type="number" data-input="disc-value" data-section="' + section + '" value="' + esc(cfg.value) + '" style="flex:1;min-width:0;' + S.input + '" />' +
-          '<span style="flex:none;font-size:13px;color:#8A93A1;font-weight:600;">' + (cfg.type === 'percent' ? '%' : '원') + '</span>' +
-        '</div>' +
-        '<div id="helper-' + section + '" style="margin-top:8px;font-size:12px;color:#8A93A1;line-height:1.6;">' + esc(isGeneral ? generalHelperText(d) : affiliateHelperText(d)) + '</div>';
-    }
-    html += '</div>';
+      '<div style="margin-top:12px;padding:10px 12px;border-radius:10px;background:#F5F6F8;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
+        '<span style="font-size:11.5px;font-weight:800;color:#FF6A3D;">적용 예시</span>' +
+        '<span id="preview-' + section + '" style="font-size:12.5px;font-weight:700;color:#4B5563;">' + esc(discountPreviewText(section)) + '</span>' +
+      '</div>' +
+    '</div>';
     return html;
+  }
+
+  function renderFixedDiscountTable() {
+    var d = state.discountConfig;
+    if (d.general.type !== 'fixed' && d.affiliate.type !== 'fixed') return '';
+
+    var categoryLabels = { lift: '리프트권', equipment: '장비', clothing: '의류', safety: '안전장비' };
+    var rows = '';
+    CATALOG_TABS.forEach(function (cat) {
+      var items = state.catalog[cat] || [];
+      if (!items.length) return;
+      rows += '<tr><th colspan="4" style="padding:10px 12px;background:#F5F6F8;color:#4B5563;font-size:12px;font-weight:800;text-align:left;border-bottom:1px solid #E6E8EC;">' + categoryLabels[cat] + '</th></tr>';
+      items.forEach(function (it) {
+        var generalDisabled = d.general.type !== 'fixed' || !d.general.enabled;
+        var affiliateDisabled = d.affiliate.type !== 'fixed' || !d.affiliate.enabled;
+        rows += '<tr>' +
+          '<td style="padding:11px 12px;border-bottom:1px solid #F0F1F3;font-size:13px;font-weight:700;color:#14263F;">' + esc(it.name) + '</td>' +
+          '<td style="padding:11px 12px;border-bottom:1px solid #F0F1F3;font-size:12.5px;color:#4B5563;white-space:nowrap;">' + JSTStore.won(it.price) + '</td>' +
+          '<td style="padding:8px 10px;border-bottom:1px solid #F0F1F3;">' +
+            '<input type="number" min="0" data-input="fixed-item-discount" data-cat="' + cat + '" data-id="' + esc(it.id) + '" data-field="discountGeneral" value="' + esc(it.discountGeneral || '') + '" placeholder="기본값 사용"' + (generalDisabled ? ' disabled' : '') + ' aria-label="' + esc(it.name) + ' 기본할인" style="min-width:116px;' + S.input + (generalDisabled ? 'background:#F5F6F8;color:#C3C9D2;cursor:not-allowed;' : '') + '" />' +
+          '</td>' +
+          '<td style="padding:8px 10px;border-bottom:1px solid #F0F1F3;">' +
+            '<input type="number" min="0" data-input="fixed-item-discount" data-cat="' + cat + '" data-id="' + esc(it.id) + '" data-field="discountAffiliate" value="' + esc(it.discountAffiliate || '') + '" placeholder="기본값 사용"' + (affiliateDisabled ? ' disabled' : '') + ' aria-label="' + esc(it.name) + ' 제휴할인" style="min-width:116px;' + S.input + (affiliateDisabled ? 'background:#F5F6F8;color:#C3C9D2;cursor:not-allowed;' : '') + '" />' +
+          '</td>' +
+        '</tr>';
+      });
+    });
+
+    return '<div>' +
+      '<div style="font-size:15px;font-weight:800;color:#14263F;margin-bottom:6px;">품목별 정액할인</div>' +
+      '<p style="margin:0 0 12px;font-size:12.5px;color:#8A93A1;line-height:1.6;">0 또는 빈칸이면 위에서 설정한 기본값을 사용해요. 정액 할인이 켜진 열만 입력할 수 있어요.</p>' +
+      '<div style="overflow-x:auto;border:1px solid #E6E8EC;border-radius:12px;">' +
+        '<table style="width:100%;min-width:620px;border-collapse:collapse;background:#FFFFFF;">' +
+          '<thead><tr style="background:#FAFAFB;">' +
+            '<th style="padding:11px 12px;text-align:left;font-size:12px;color:#8A93A1;border-bottom:1px solid #E6E8EC;">품목</th>' +
+            '<th style="padding:11px 12px;text-align:left;font-size:12px;color:#8A93A1;border-bottom:1px solid #E6E8EC;">가격</th>' +
+            '<th style="padding:11px 12px;text-align:left;font-size:12px;color:#8A93A1;border-bottom:1px solid #E6E8EC;">기본할인(원)</th>' +
+            '<th style="padding:11px 12px;text-align:left;font-size:12px;color:#8A93A1;border-bottom:1px solid #E6E8EC;">제휴할인(원)</th>' +
+          '</tr></thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table>' +
+      '</div>' +
+    '</div>';
   }
 
   function renderDiscountTab() {
@@ -145,10 +223,12 @@
       chips = '<span style="font-size:13px;color:#C3C9D2;padding:7px 0;">등록된 키워드가 없어요.</span>';
     }
     return '<div style="display:flex;flex-direction:column;gap:22px;">' +
+      '<div id="discount-summary" style="padding:15px 16px;border-radius:14px;background:#14263F;color:#FFFFFF;font-size:14px;font-weight:800;line-height:1.6;">' + esc(discountSummaryText()) + '</div>' +
       renderDiscountSection('general') +
-      '<div style="height:1px;background:#F0F1F3;"></div>' +
       renderDiscountSection('affiliate') +
       '<div style="height:1px;background:#F0F1F3;"></div>' +
+      renderFixedDiscountTable() +
+      (d.general.type === 'fixed' || d.affiliate.type === 'fixed' ? '<div style="height:1px;background:#F0F1F3;"></div>' : '') +
       '<div>' +
         '<div style="font-size:15px;font-weight:800;color:#14263F;margin-bottom:6px;">제휴 키워드</div>' +
         '<p style="margin:0 0 14px;font-size:12.5px;color:#8A93A1;line-height:1.6;">고객이 셀프견적에서 입력한 제휴업체명에 아래 단어 중 하나라도 포함되어 있으면 제휴업체 할인이 적용돼요.</p>' +
@@ -163,16 +243,9 @@
 
   function renderCatalogTab() {
     var cat = state.activeTab;
-    var d = state.discountConfig;
     var items = state.catalog[cat] || [];
-    var showGeneralFixed = d.general.type === 'fixed';
-    var showAffiliateFixed = d.affiliate.type === 'fixed';
 
     var html = '<div style="font-size:12.5px;font-weight:700;color:#8A93A1;margin-bottom:14px;">' + items.length + '개 품목</div>';
-
-    if (showGeneralFixed || showAffiliateFixed) {
-      html += '<div style="margin-bottom:14px;padding:10px 14px;border-radius:11px;background:#FFF9F5;border:1px solid #FFD9C4;font-size:12px;color:#4B5563;line-height:1.6;">품목마다 정액할인 금액을 다르게 넣을 수 있어요. 비워두면 할인 설정 탭의 기본값이 적용돼요.</div>';
-    }
 
     html += '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">';
     items.forEach(function (it) {
@@ -187,22 +260,8 @@
             '<input type="number" data-input="item-field" data-id="' + esc(it.id) + '" data-field="price" value="' + esc(it.price) + '" placeholder="가격" style="flex:1;min-width:0;' + S.input + '" />' +
             '<span style="flex:none;font-size:13px;color:#8A93A1;font-weight:600;">원</span>' +
           '</div>' +
-        '</div>';
-      if (showGeneralFixed) {
-        html += '<div style="display:flex;align-items:center;gap:8px;">' +
-          '<span style="flex:none;font-size:12px;color:#8A93A1;font-weight:700;white-space:nowrap;min-width:82px;">기본 정액할인</span>' +
-          '<input type="number" data-input="item-field" data-id="' + esc(it.id) + '" data-field="discountGeneral" value="' + esc(it.discountGeneral || 0) + '" placeholder="미입력시 ' + (d.general.value || 0) + '원" style="flex:1;min-width:0;padding:9px 11px;border-radius:9px;border:1.5px solid #E6E8EC;font-size:13px;color:#14263F;width:100%;" />' +
-          '<span style="flex:none;font-size:12.5px;color:#8A93A1;font-weight:600;">원</span>' +
-        '</div>';
-      }
-      if (showAffiliateFixed) {
-        html += '<div style="display:flex;align-items:center;gap:8px;">' +
-          '<span style="flex:none;font-size:12px;color:#8A93A1;font-weight:700;white-space:nowrap;min-width:82px;">제휴 정액할인</span>' +
-          '<input type="number" data-input="item-field" data-id="' + esc(it.id) + '" data-field="discountAffiliate" value="' + esc(it.discountAffiliate || 0) + '" placeholder="미입력시 ' + (d.affiliate.value || 0) + '원" style="flex:1;min-width:0;padding:9px 11px;border-radius:9px;border:1.5px solid #E6E8EC;font-size:13px;color:#14263F;width:100%;" />' +
-          '<span style="flex:none;font-size:12.5px;color:#8A93A1;font-weight:600;">원</span>' +
-        '</div>';
-      }
-      html += '</div>';
+        '</div>' +
+      '</div>';
     });
     html += '</div>';
 
@@ -434,12 +493,16 @@
       else if (field === 'discountGeneral' || field === 'discountAffiliate') it[field] = nonNegFloat(v);
       else it[field] = v;
       persistCatalog();
+    } else if (kind === 'fixed-item-discount') {
+      var discountItem = (state.catalog[el.dataset.cat] || []).find(function (x) { return x.id === el.dataset.id; });
+      if (!discountItem) return;
+      discountItem[el.dataset.field] = nonNegFloat(v);
+      persistCatalog();
     } else if (kind === 'disc-value') {
       var section = el.dataset.section;
       state.discountConfig[section].value = nonNegFloat(v);
       persistDiscount();
-      var helper = document.getElementById('helper-' + section);
-      if (helper) helper.textContent = section === 'general' ? generalHelperText(state.discountConfig) : affiliateHelperText(state.discountConfig);
+      updateDiscountDynamicText();
     } else if (kind === 'notice-field') {
       var id = Number(el.dataset.id);
       var n = state.notices.find(function (x) { return x.id === id; });
