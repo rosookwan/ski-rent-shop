@@ -18,6 +18,14 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
+class NoticeFileOut(StrictModel):
+    id: int = Field(ge=1)
+    name: str = Field(min_length=1, max_length=255)
+    size: int = Field(ge=0, le=10 * 1024 * 1024)
+    mimeType: Literal["application/pdf", "image/png", "image/jpeg", "image/webp"]
+    downloadUrl: str = Field(pattern=r"^/api/notices/[1-9][0-9]*/files/[1-9][0-9]*$")
+
+
 class NoticeOut(StrictModel):
     id: int
     tag: str
@@ -25,7 +33,7 @@ class NoticeOut(StrictModel):
     date: str
     body: str
     pinned: bool
-    files: list[dict[str, object]] = Field(default_factory=list)
+    files: list[NoticeFileOut] = Field(default_factory=list)
 
 
 class NoticePage(StrictModel):

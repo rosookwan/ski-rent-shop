@@ -6,7 +6,7 @@ import sqlite3
 from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Cookie, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 
 from .admin_auth import (
     LOGIN_BLOCK_MINUTES,
@@ -23,7 +23,6 @@ from .admin_repository import (
     create_notice,
     delete_catalog_item,
     delete_inquiry,
-    delete_notice,
     get_admin_catalog,
     get_admin_inquiry,
     list_admin_inquiries,
@@ -33,6 +32,18 @@ from .admin_repository import (
     update_catalog_item,
     update_inquiry,
     update_notice,
+)
+from .attachments import (
+    AttachmentCleanupError,
+    AttachmentLimitReached,
+    AttachmentNotFound,
+    AttachmentTooLarge,
+    AttachmentUnsupported,
+    AttachmentValidationError,
+    NoticeNotFound,
+    delete_notice_file,
+    delete_notice_with_files,
+    store_notice_file,
 )
 from .repository import get_discount_config
 from .schemas import (
@@ -49,6 +60,7 @@ from .schemas import (
     CatalogOut,
     Category,
     DiscountConfigOut,
+    NoticeFileOut,
     NoticeOut,
     NoticePage,
 )
@@ -171,9 +183,75 @@ def edit_notice(
     return notice
 
 
+@router.post(
+    "/notices/{notice_id}/files",
+    response_model=NoticeFileOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_notice_file(
+    notice_id: int,
+    request: Request,
+    file: Annotated[UploadFile, File()],
+    _: AllowedOrigin,
+    __: Admin,
+) -> dict[str, object]:
+    try:
+        return await store_notice_file(
+            _db_path(request),
+            request.app.state.settings.upload_dir,
+            notice_id,
+            file,
+        )
+    except NoticeNotFound as error:
+        raise HTTPException(status_code=404, detail="공지사항을 찾을 수 없습니다.") from error
+    except AttachmentValidationError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except AttachmentUnsupported as error:
+        raise HTTPException(status_code=415, detail=str(error)) from error
+    except AttachmentTooLarge as error:
+        raise HTTPException(status_code=413, detail=str(error)) from error
+    except AttachmentLimitReached as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    finally:
+        await file.close()
+
+
+@router.delete(
+    "/notices/{notice_id}/files/{file_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def remove_notice_file(
+    notice_id: int,
+    file_id: int,
+    request: Request,
+    _: AllowedOrigin,
+    __: Admin,
+) -> Response:
+    try:
+        delete_notice_file(
+            _db_path(request),
+            request.app.state.settings.upload_dir,
+            notice_id,
+            file_id,
+        )
+    except AttachmentNotFound as error:
+        raise HTTPException(status_code=404, detail="첨부파일을 찾을 수 없습니다.") from error
+    except AttachmentCleanupError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.delete("/notices/{notice_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_notice(notice_id: int, request: Request, _: AllowedOrigin, __: Admin) -> Response:
-    if not delete_notice(_db_path(request), notice_id):
+    try:
+        deleted = delete_notice_with_files(
+            _db_path(request),
+            request.app.state.settings.upload_dir,
+            notice_id,
+        )
+    except AttachmentCleanupError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    if not deleted:
         raise HTTPException(status_code=404, detail="공지사항을 찾을 수 없습니다.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

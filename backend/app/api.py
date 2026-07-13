@@ -5,7 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi.responses import FileResponse
 
+from .attachments import AttachmentCleanupError, AttachmentNotFound, get_notice_file
 from .repository import (
     InquiryNotFound,
     InquiryPasswordInvalid,
@@ -53,6 +55,26 @@ def notice_detail(request: Request, notice_id: int) -> dict[str, object]:
     if not notice:
         raise HTTPException(status_code=404, detail="공지사항을 찾을 수 없습니다.")
     return notice
+
+
+@router.get("/notices/{notice_id}/files/{file_id}", tags=["notices"])
+def download_notice_file(request: Request, notice_id: int, file_id: int) -> FileResponse:
+    try:
+        path, original_name, mime_type = get_notice_file(
+            _db_path(request),
+            request.app.state.settings.upload_dir,
+            notice_id,
+            file_id,
+        )
+    except (AttachmentNotFound, AttachmentCleanupError) as error:
+        raise HTTPException(status_code=404, detail="첨부파일을 찾을 수 없습니다.") from error
+    return FileResponse(
+        path,
+        media_type=mime_type,
+        filename=original_name,
+        content_disposition_type="attachment",
+        headers={"X-Content-Type-Options": "nosniff"},
+    )
 
 
 @router.get("/catalog", response_model=CatalogOut, tags=["catalog"])

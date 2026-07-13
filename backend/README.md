@@ -1,7 +1,7 @@
 # 준스키타운 백엔드
 
-M3에서 사용하는 FastAPI + SQLite 백엔드다. 현재 R11까지 실행 기반, DB 마이그레이션,
-공용·관리자 API, 실제 관리자 인증과 초기 데이터 시딩을 포함한다.
+M3에서 사용하는 FastAPI + SQLite 백엔드다. 현재 R12까지 실행 기반, DB 마이그레이션,
+공용·관리자 API, 실제 관리자 인증, 공지 첨부파일과 초기 데이터 시딩을 포함한다.
 
 ## 디렉터리
 
@@ -15,6 +15,7 @@ backend/
 │   ├── admin_auth.py   # 관리자 로그인 제한·서버 세션
 │   ├── admin_api.py    # 관리자 인증·관리 API
 │   ├── admin_repository.py # 관리자 데이터 SQL
+│   ├── attachments.py  # 첨부 검증·저장·삭제·고아 파일 점검
 │   ├── cli.py          # 관리자 계정 관리 명령
 │   ├── schemas.py      # API 요청·응답 검증
 │   ├── security.py     # 비밀번호 scrypt 해시
@@ -66,6 +67,7 @@ python -m unittest discover -s tests -v
 | GET | `/api/health` | 서버·DB 상태 확인 |
 | GET | `/api/notices?page=1&pageSize=10` | 고정 우선 공지 목록 |
 | GET | `/api/notices/{id}` | 공지 상세 |
+| GET | `/api/notices/{id}/files/{fileId}` | 공지 첨부파일 다운로드 |
 | GET | `/api/catalog` | 노출 품목 목록 |
 | GET | `/api/discounts` | 할인 설정 |
 | GET | `/api/inquiries?page=1&pageSize=10` | 개인정보를 제외한 문의 목록 |
@@ -101,6 +103,8 @@ python -m app.cli set-admin-password --login-id operator
 | GET | `/api/admin/auth/session` | 현재 세션 확인 |
 | GET/POST | `/api/admin/notices` | 공지 검색·페이지 조회/작성 |
 | PUT/DELETE | `/api/admin/notices/{id}` | 공지 수정/삭제 |
+| POST | `/api/admin/notices/{id}/files` | 공지 첨부파일 업로드 |
+| DELETE | `/api/admin/notices/{id}/files/{fileId}` | 공지 첨부파일 삭제 |
 | GET/POST | `/api/admin/catalog`, `/api/admin/catalog/{category}` | 전체 품목 조회/작성 |
 | PUT/DELETE | `/api/admin/catalog/{category}/{itemId}` | 품목 수정·숨김/삭제 |
 | PUT | `/api/admin/catalog/{category}/order` | 카테고리 품목 순서 저장 |
@@ -108,8 +112,27 @@ python -m app.cli set-admin-password --login-id operator
 | GET | `/api/admin/inquiries` | 문의 검색·필터·페이지 조회 |
 | GET/PATCH/DELETE | `/api/admin/inquiries/{id}` | 문의 원문·견적 조회/답변·상태 수정/삭제 |
 
-관리자 API 응답에는 비밀번호 해시와 세션 토큰을 포함하지 않는다. 공지 첨부파일 API는 R12에서
-추가한다.
+관리자 API 응답에는 비밀번호 해시와 세션 토큰을 포함하지 않는다.
+
+## 공지 첨부파일
+
+관리자 첨부 업로드는 `multipart/form-data`의 `file` 필드를 사용한다. PDF·JPG·PNG·WEBP만
+허용하며 확장자, 요청 MIME, 실제 파일 시그니처가 모두 일치해야 한다. 공지 하나당 최대 5개,
+개별 10MB, 전체 25MB까지 저장한다. 원본 파일명은 표시용 메타데이터로만 보관하고 실제 파일은
+서버가 만든 UUID 이름으로 `JST_UPLOAD_DIR`에 저장한다.
+
+공지 상세의 `files`에는 `id`, `name`, `size`, `mimeType`, `downloadUrl`이 포함된다. 다운로드는
+인증 없이 가능하지만 DB 메타데이터와 업로드 루트 검증을 모두 통과한 파일만 `attachment`와
+`X-Content-Type-Options: nosniff` 헤더로 제공한다. 첨부 또는 공지 삭제 후 실제 파일 정리에
+실패한 경우 아래 명령으로 고아 파일과 실제 파일이 없는 DB 항목을 확인할 수 있다.
+
+```bash
+python -m app.cli check-upload-files
+python -m app.cli check-upload-files --delete-orphans
+```
+
+문제가 남아 있으면 명령은 종료 코드 1을 반환한다. `--delete-orphans`는 DB에 없는 업로드 파일만
+삭제하며, 실제 파일이 없는 DB 항목은 자동으로 변경하지 않는다.
 
 ## 마이그레이션 규칙
 

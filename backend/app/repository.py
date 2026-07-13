@@ -41,7 +41,37 @@ def _page_result(items: list[dict[str, Any]], page: int, page_size: int, total: 
     }
 
 
-def _notice_from_row(row: Any) -> dict[str, Any]:
+def _notice_file_from_row(row: Any) -> dict[str, Any]:
+    notice_id = int(row["notice_id"])
+    file_id = int(row["id"])
+    return {
+        "id": file_id,
+        "name": row["original_name"],
+        "size": int(row["size_bytes"]),
+        "mimeType": row["mime_type"],
+        "downloadUrl": f"/api/notices/{notice_id}/files/{file_id}",
+    }
+
+
+def _notice_files_by_id(connection: Any, notice_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
+    files: dict[int, list[dict[str, Any]]] = {notice_id: [] for notice_id in notice_ids}
+    if not notice_ids:
+        return files
+    placeholders = ",".join("?" for _ in notice_ids)
+    rows = connection.execute(
+        f"""
+        SELECT id, notice_id, original_name, mime_type, size_bytes
+        FROM notice_files WHERE notice_id IN ({placeholders})
+        ORDER BY id
+        """,
+        notice_ids,
+    ).fetchall()
+    for row in rows:
+        files[int(row["notice_id"])].append(_notice_file_from_row(row))
+    return files
+
+
+def _notice_from_row(row: Any, files: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     return {
         "id": int(row["id"]),
         "tag": row["tag"],
@@ -49,7 +79,7 @@ def _notice_from_row(row: Any) -> dict[str, Any]:
         "date": _date_label(row["published_at"]),
         "body": row["body"],
         "pinned": bool(row["pinned"]),
-        "files": [],
+        "files": files or [],
     }
 
 
@@ -66,7 +96,13 @@ def list_notices(db_path: Path, page: int, page_size: int) -> dict[str, Any]:
             """,
             (page_size, offset),
         ).fetchall()
-    return _page_result([_notice_from_row(row) for row in rows], page, page_size, total)
+        files_by_id = _notice_files_by_id(connection, [int(row["id"]) for row in rows])
+    return _page_result(
+        [_notice_from_row(row, files_by_id[int(row["id"])]) for row in rows],
+        page,
+        page_size,
+        total,
+    )
 
 
 def get_notice(db_path: Path, notice_id: int) -> dict[str, Any] | None:
@@ -75,7 +111,8 @@ def get_notice(db_path: Path, notice_id: int) -> dict[str, Any] | None:
             "SELECT id, tag, title, body, pinned, published_at FROM notices WHERE id = ?",
             (notice_id,),
         ).fetchone()
-    return _notice_from_row(row) if row else None
+        files = _notice_files_by_id(connection, [notice_id])[notice_id] if row else []
+    return _notice_from_row(row, files) if row else None
 
 
 def get_catalog(db_path: Path) -> dict[str, list[dict[str, Any]]]:

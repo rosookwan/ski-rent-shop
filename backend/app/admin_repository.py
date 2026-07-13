@@ -8,7 +8,13 @@ from pathlib import Path
 from typing import Any
 
 from .database import connect
-from .repository import CATEGORIES, _date_label, _notice_from_row, get_discount_config
+from .repository import (
+    CATEGORIES,
+    _date_label,
+    _notice_files_by_id,
+    _notice_from_row,
+    get_discount_config,
+)
 from .schemas import (
     AdminCatalogItemInput,
     AdminCatalogItemUpdate,
@@ -47,7 +53,13 @@ def list_admin_notices(db_path: Path, page: int, page_size: int, query: str) -> 
             """,
             [*params, page_size, offset],
         ).fetchall()
-    return _page_result([_notice_from_row(row) for row in rows], page, page_size, total)
+        files_by_id = _notice_files_by_id(connection, [int(row["id"]) for row in rows])
+    return _page_result(
+        [_notice_from_row(row, files_by_id[int(row["id"])]) for row in rows],
+        page,
+        page_size,
+        total,
+    )
 
 
 def create_notice(db_path: Path, payload: AdminNoticeInput) -> dict[str, Any]:
@@ -61,7 +73,7 @@ def create_notice(db_path: Path, payload: AdminNoticeInput) -> dict[str, Any]:
             "SELECT id, tag, title, body, pinned, published_at FROM notices WHERE id = ?",
             (notice_id,),
         ).fetchone()
-    return _notice_from_row(row)
+    return _notice_from_row(row, [])
 
 
 def update_notice(db_path: Path, notice_id: int, payload: AdminNoticeInput) -> dict[str, Any] | None:
@@ -80,12 +92,8 @@ def update_notice(db_path: Path, notice_id: int, payload: AdminNoticeInput) -> d
             "SELECT id, tag, title, body, pinned, published_at FROM notices WHERE id = ?",
             (notice_id,),
         ).fetchone()
-    return _notice_from_row(row)
-
-
-def delete_notice(db_path: Path, notice_id: int) -> bool:
-    with connect(db_path) as connection:
-        return connection.execute("DELETE FROM notices WHERE id = ?", (notice_id,)).rowcount > 0
+        files = _notice_files_by_id(connection, [notice_id])[notice_id]
+    return _notice_from_row(row, files)
 
 
 def _catalog_item(row: Any) -> dict[str, Any]:
