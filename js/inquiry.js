@@ -100,6 +100,7 @@
     };
     state.inquiries = [record].concat(state.inquiries);
     JST.saveInquiries(state.inquiries);
+    if (state.fromEstimate) JST.clearEstimateDraft();
     state.page = 1;
     state.submitted = true;
     state.formError = '';

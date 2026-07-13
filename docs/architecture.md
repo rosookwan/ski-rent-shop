@@ -64,6 +64,11 @@
   affiliateName: '', lines: [{ group, label, qty, subtotal, subtotalValue, cat, itemId }],
   total: '128,250원', totalValue: 128250, email: '', createdAt: ISO문자열 }
 
+// jst_estimate_draft — 셀프견적 작성 중 자동 저장
+{ affiliateType: 'none'|'affiliate', affiliateName: '', scheduleUndecided: false,
+  startDate: '2026-12-24', endDate: '2026-12-26', adult: 2, child: 0,
+  liftQty: {}, equipmentQty: {}, clothingQty: {}, safetyQty: {}, savedAt: ISO문자열 }
+
 // jst_trip_info — 홈 → 셀프견적 전달 일정·인원
 { undecided: false, start: '2026-12-24', end: '2026-12-26', adult: 2, child: 0 }
 

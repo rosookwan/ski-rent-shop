@@ -20,6 +20,7 @@ window.JSTStore = (function () {
     notices: 'jst_notices',
     inquiries: 'jst_inquiries',
     estimate: 'jst_estimate',
+    estimateDraft: 'jst_estimate_draft',
     tripInfo: 'jst_trip_info',
     adminSession: 'jst_admin_session',
   };
@@ -54,6 +55,10 @@ window.JSTStore = (function () {
 
   function saveRaw(key, value) {
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+  }
+
+  function removeRaw(key) {
+    try { localStorage.removeItem(key); } catch (e) {}
   }
 
   // ── 기본(시드) 데이터 ───────────────────────────────────────
@@ -154,6 +159,16 @@ window.JSTStore = (function () {
   function loadEstimate() { return loadRaw(KEYS.estimate, null); }
   function saveEstimate(payload) { saveRaw(KEYS.estimate, payload); }
 
+  /** 셀프견적 작성 중 자동 저장 데이터 */
+  function loadEstimateDraft() {
+    return loadRaw(KEYS.estimateDraft, null, function (draft) {
+      return !!draft && typeof draft === 'object' &&
+        draft.liftQty && draft.equipmentQty && draft.clothingQty && draft.safetyQty;
+    });
+  }
+  function saveEstimateDraft(draft) { saveRaw(KEYS.estimateDraft, draft); }
+  function clearEstimateDraft() { removeRaw(KEYS.estimateDraft); }
+
   /** 홈 → 셀프견적 전달 일정·인원 */
   function loadTripInfo() { return loadRaw(KEYS.tripInfo, null); }
   function saveTripInfo(info) { saveRaw(KEYS.tripInfo, info); }
@@ -182,6 +197,7 @@ window.JSTStore = (function () {
     loadNotices: loadNotices, saveNotices: saveNotices,
     loadInquiries: loadInquiries, saveInquiries: saveInquiries, verifyInquiryPassword: verifyInquiryPassword,
     loadEstimate: loadEstimate, saveEstimate: saveEstimate,
+    loadEstimateDraft: loadEstimateDraft, saveEstimateDraft: saveEstimateDraft, clearEstimateDraft: clearEstimateDraft,
     loadTripInfo: loadTripInfo, saveTripInfo: saveTripInfo,
     hasAdminSession: hasAdminSession, setAdminSession: setAdminSession, clearAdminSession: clearAdminSession,
   };

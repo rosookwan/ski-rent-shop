@@ -32,6 +32,8 @@
     if (typeof tripInfo.child === 'number') state.child = tripInfo.child;
   }
 
+  var pendingDraft = JST.loadEstimateDraft();
+
   var S = {
     pillOn: 'flex:none;padding:7px 13px;border-radius:999px;background:#14263F;color:#FFFFFF;font-weight:700;font-size:12.5px;border:none;cursor:pointer;white-space:nowrap;font-family:inherit;',
     pillOff: 'flex:none;padding:7px 13px;border-radius:999px;background:#FFFFFF;color:#8A93A1;font-weight:600;font-size:12.5px;border:1.5px solid #E6E8EC;cursor:pointer;white-space:nowrap;font-family:inherit;',
@@ -41,6 +43,28 @@
     tabOn: 'flex:none;padding:9px 16px;border-radius:11px;background:#14263F;color:#FFFFFF;font-weight:700;font-size:13.5px;border:none;cursor:pointer;font-family:inherit;white-space:nowrap;',
     tabOff: 'flex:none;padding:9px 16px;border-radius:11px;background:#FFFFFF;color:#4B5563;font-weight:600;font-size:13.5px;border:1.5px solid #E6E8EC;cursor:pointer;font-family:inherit;white-space:nowrap;',
   };
+
+  function buildDraft() {
+    return {
+      affiliateType: state.affiliateType,
+      affiliateName: state.affiliateName,
+      scheduleUndecided: state.scheduleUndecided,
+      startDate: state.startDate,
+      endDate: state.endDate,
+      adult: state.adult,
+      child: state.child,
+      liftQty: state.liftQty,
+      equipmentQty: state.equipmentQty,
+      clothingQty: state.clothingQty,
+      safetyQty: state.safetyQty,
+      savedAt: new Date().toISOString(),
+    };
+  }
+
+  function saveDraft() {
+    pendingDraft = null;
+    JST.saveEstimateDraft(buildDraft());
+  }
 
   // ── 날짜 계산 ───────────────────────────────────────────────
   function getDays() {
@@ -109,6 +133,21 @@
   }
 
   // ── 렌더링 ──────────────────────────────────────────────────
+  function renderResumeBanner() {
+    var el = document.getElementById('resumeBanner');
+    if (!pendingDraft) { el.innerHTML = ''; return; }
+    el.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:24px;padding:16px clamp(16px,4vw,22px);border:1px solid #FFD7C8;border-radius:16px;background:#FFF7F2;">' +
+      '<div style="display:flex;align-items:center;gap:10px;min-width:0;">' +
+        '<span aria-hidden="true" style="font-size:20px;">⛷️</span>' +
+        '<span style="font-size:14px;font-weight:800;color:#14263F;">이전에 담던 견적이 있어요</span>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+        '<button data-action="resume-draft" style="padding:10px 15px;border-radius:10px;border:none;background:#FF6A3D;color:#FFFFFF;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;">이어서 하기</button>' +
+        '<button data-action="new-draft" style="padding:10px 15px;border-radius:10px;border:1px solid #E6E8EC;background:#FFFFFF;color:#4B5563;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">새로 시작</button>' +
+      '</div>' +
+    '</div>';
+  }
+
   function counterRow(name, desc, qty, decAttr, incAttr) {
     return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid #F0F1F3;">' +
       '<div style="min-width:0;">' +
@@ -382,6 +421,7 @@
   }
 
   function renderAll() {
+    renderResumeBanner();
     renderTrip();
     renderLift();
     renderRental();
@@ -424,18 +464,28 @@
       email: state.email || '',
       createdAt: new Date().toISOString(),
     };
+    saveDraft();
     JST.saveEstimate(payload);
     window.location.href = 'inquiry.html?mode=write&from=estimate';
   }
 
   var actions = {
-    'affiliate-none': function () { state.affiliateType = 'none'; renderAll(); },
-    'affiliate-partner': function () { state.affiliateType = 'affiliate'; renderAll(); },
-    'toggle-undecided': function () { state.scheduleUndecided = !state.scheduleUndecided; renderAll(); },
-    'inc-adult': function () { state.adult = Math.min(20, state.adult + 1); renderAll(); },
-    'dec-adult': function () { state.adult = Math.max(1, state.adult - 1); renderAll(); },
-    'inc-child': function () { state.child = Math.min(20, state.child + 1); renderAll(); },
-    'dec-child': function () { state.child = Math.max(0, state.child - 1); renderAll(); },
+    'resume-draft': function () {
+      var isMobile = state.isMobile;
+      state = Object.assign(defaultState(), pendingDraft || {});
+      state.isMobile = isMobile;
+      pendingDraft = null;
+      JST.saveEstimateDraft(buildDraft());
+      renderAll();
+    },
+    'new-draft': function () { pendingDraft = null; JST.clearEstimateDraft(); renderAll(); },
+    'affiliate-none': function () { state.affiliateType = 'none'; saveDraft(); renderAll(); },
+    'affiliate-partner': function () { state.affiliateType = 'affiliate'; saveDraft(); renderAll(); },
+    'toggle-undecided': function () { state.scheduleUndecided = !state.scheduleUndecided; saveDraft(); renderAll(); },
+    'inc-adult': function () { state.adult = Math.min(20, state.adult + 1); saveDraft(); renderAll(); },
+    'dec-adult': function () { state.adult = Math.max(1, state.adult - 1); saveDraft(); renderAll(); },
+    'inc-child': function () { state.child = Math.min(20, state.child + 1); saveDraft(); renderAll(); },
+    'dec-child': function () { state.child = Math.max(0, state.child - 1); saveDraft(); renderAll(); },
 
     'select-lift-day': function (el) { state.activeLiftDayIndex = Number(el.dataset.idx); renderAll(); },
     'apply-all-lift': function () {
@@ -446,6 +496,7 @@
         var v = state.liftQty[srcKey + t.id] || 0;
         days.forEach(function (d) { state.liftQty[d.key + '__' + t.id] = v; });
       });
+      saveDraft();
       renderAll();
     },
     'lift-qty': function (el) {
@@ -453,6 +504,7 @@
       var day = days[Math.min(state.activeLiftDayIndex, days.length - 1)];
       var key = day.key + '__' + el.dataset.id;
       state.liftQty[key] = Math.max(0, (state.liftQty[key] || 0) + Number(el.dataset.delta));
+      saveDraft();
       renderAll();
     },
 
@@ -468,6 +520,7 @@
           days.forEach(function (d) { state[cat + 'Qty'][d.key + '__' + it.id] = v; });
         });
       });
+      saveDraft();
       renderAll();
     },
     'rental-qty': function (el) {
@@ -476,6 +529,7 @@
       var cat = state.activeRentalTab;
       var key = day.key + '__' + el.dataset.id;
       state[cat + 'Qty'][key] = Math.max(0, (state[cat + 'Qty'][key] || 0) + Number(el.dataset.delta));
+      saveDraft();
       renderAll();
     },
 
@@ -490,6 +544,8 @@
       var isMobile = state.isMobile;
       state = defaultState();
       state.isMobile = isMobile;
+      pendingDraft = null;
+      JST.clearEstimateDraft();
       renderAll();
     },
   };
@@ -503,7 +559,7 @@
     var el = e.target.closest('[data-input]');
     if (!el) return;
     var k = el.dataset.input;
-    if (k === 'affiliate-name') state.affiliateName = el.value;
+    if (k === 'affiliate-name') { state.affiliateName = el.value; saveDraft(); }
     else if (k === 'email') { state.email = el.value; state.emailSent = false; state.emailError = ''; }
   });
 
@@ -514,9 +570,11 @@
     if (k === 'start-date') {
       state.startDate = el.value;
       if (state.endDate && state.endDate < state.startDate) state.endDate = state.startDate;
+      saveDraft();
       renderAll();
     } else if (k === 'end-date') {
       state.endDate = el.value;
+      saveDraft();
       renderAll();
     }
   });
