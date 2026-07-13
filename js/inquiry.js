@@ -30,9 +30,8 @@
       if (!isNaN(id)) state.selectedId = id;
     }
     if (params.get('from') === 'estimate') {
-      var raw = localStorage.getItem('jst_estimate');
-      if (raw) {
-        var est = JSON.parse(raw);
+      var est = JST.loadEstimate();
+      if (est) {
         state.fromEstimate = true;
         state.attachedEstimate = est;
         state.title = '셀프견적 문의';
@@ -98,7 +97,7 @@
       answer: '',
     };
     state.inquiries = [record].concat(state.inquiries);
-    try { localStorage.setItem('jst_inquiries', JSON.stringify(state.inquiries)); } catch (e) {}
+    JST.saveInquiries(state.inquiries);
     state.submitted = true;
     state.formError = '';
     render();
@@ -358,9 +357,9 @@
   });
 
   window.addEventListener('storage', function (e) {
-    if (!e || e.key === 'jst_inquiries') { state.inquiries = JST.loadInquiries(); render(); }
-    if (!e || e.key === 'jst_discount_config') { state.discountConfig = JST.loadDiscountConfig(); render(); }
-    if (!e || e.key === 'jst_catalog') { state.catalog = JST.loadCatalog(); render(); }
+    if (!e || e.key === JST.KEYS.inquiries) { state.inquiries = JST.loadInquiries(); render(); }
+    if (!e || e.key === JST.KEYS.discount) { state.discountConfig = JST.loadDiscountConfig(); render(); }
+    if (!e || e.key === JST.KEYS.catalog) { state.catalog = JST.loadCatalog(); render(); }
   });
 
   render();

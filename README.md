@@ -3,17 +3,33 @@
 무주 스키 렌탈샵 "준스키타운" 홈페이지입니다.
 [Claude Design](https://claude.ai/design/p/62b09341-9bfb-4960-9165-b86bec0aba5b)에서 제작한 화면들을 바닐라 HTML/CSS/JS로 구현했습니다.
 
-## 페이지
+## 구조
 
-| 파일 | 디자인 원본 | 설명 |
+```
+*.html           # 페이지 (루트 고정 — GitHub Pages URL 유지)
+css/base.css     # 공통 스타일
+js/store.js      # 데이터 계층 (모든 localStorage 접근은 여기서만)
+js/site.js       # 사용자 공통 헤더/푸터
+js/*.js          # 페이지별 로직
+assets/img/      # 이미지
+docs/            # 개발계획서 · 아키텍처 · 마일스톤별 요구사항
+```
+
+| 페이지 | 디자인 원본 | 설명 |
 |---|---|---|
-| `index.html` + `home.js` | Home.dc.html | 홈 (히어로, 여행 준비 플로우, 제휴 숙소, 게시판 미리보기, 오시는길) |
-| `notice.html` | NoticeBoard.dc.html | 공지사항 (목록/상세, 더보기) |
-| `inquiry.html` + `inquiry.js` | InquiryBoard.dc.html | 문의게시판 (목록/상세/글쓰기, 셀프견적 첨부·할인 계산) |
-| `estimate.html` + `estimate.js` | SelfEstimate.dc.html | 셀프견적 (일정·인원, 날짜별 리프트권/렌탈 담기, 문의 연동) |
+| `index.html` + `js/home.js` | Home.dc.html | 홈 (히어로, 여행 준비 플로우, 제휴 숙소, 게시판 미리보기, 오시는길) |
+| `notice.html` + `js/notice.js` | NoticeBoard.dc.html | 공지사항 (목록/상세, 더보기) |
+| `inquiry.html` + `js/inquiry.js` | InquiryBoard.dc.html | 문의게시판 (목록/상세/글쓰기, 셀프견적 첨부·할인 계산) |
+| `estimate.html` + `js/estimate.js` | SelfEstimate.dc.html | 셀프견적 (일정·인원, 날짜별 리프트권/렌탈 담기, 문의 연동) |
 | `admin-login.html` | AdminLogin.dc.html | 관리자 로그인 |
-| `admin.html` + `admin.js` | Admin.dc.html | 관리자 (품목·할인·공지·문의 관리) |
-| `site.js` | Header.dc.html / Footer.dc.html | 공통 헤더·푸터 + 공유 데이터 모듈 |
+| `admin.html` + `js/admin.js` | Admin.dc.html | 관리자 (품목·할인·공지·문의 관리) |
+
+## 개발 문서
+
+- [AGENTS.md](AGENTS.md) — 개발 규칙·검증 절차 (에이전트/개발자 공통 진입점)
+- [docs/development-plan.md](docs/development-plan.md) — 마일스톤(M1–M4) 계획
+- [docs/architecture.md](docs/architecture.md) — 모듈 구조·데이터 스키마·UI 패턴
+- [docs/requirements/](docs/requirements/) — 마일스톤별 상세 요구사항
 
 ## 주요 기능
 

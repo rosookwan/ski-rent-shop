@@ -1,0 +1,26 @@
+/* 전 페이지 공통 스타일. 페이지 고유 스타일은 각 html의 <style>에 둔다. */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #F5F6F8;
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+  word-break: keep-all;
+  -webkit-font-smoothing: antialiased;
+}
+
+input, textarea { outline: none; font-family: inherit; }
+input:focus, textarea:focus { border-color: #FF6A3D !important; }
+
+@keyframes jstFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 푸터 모바일 하단 CTA 바 (site.js footerHTML에서 사용) */
+.jst-mobile-spacer { display: none; }
+.jst-mobile-bar { display: none; }
+@media (max-width: 899px) {
+  .jst-mobile-spacer { display: block; }
+  .jst-mobile-bar { display: flex; }
+}

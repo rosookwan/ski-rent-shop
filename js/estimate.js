@@ -23,17 +23,14 @@
   state.isMobile = window.innerWidth < 900;
 
   // 홈에서 넘어온 일정·인원 프리필
-  try {
-    var raw = localStorage.getItem('jst_trip_info');
-    if (raw) {
-      var info = JSON.parse(raw);
-      state.scheduleUndecided = !!info.undecided;
-      state.startDate = info.start || '';
-      state.endDate = info.end || '';
-      state.adult = info.adult || state.adult;
-      if (typeof info.child === 'number') state.child = info.child;
-    }
-  } catch (e) {}
+  var tripInfo = JST.loadTripInfo();
+  if (tripInfo) {
+    state.scheduleUndecided = !!tripInfo.undecided;
+    state.startDate = tripInfo.start || '';
+    state.endDate = tripInfo.end || '';
+    state.adult = tripInfo.adult || state.adult;
+    if (typeof tripInfo.child === 'number') state.child = tripInfo.child;
+  }
 
   var S = {
     pillOn: 'flex:none;padding:7px 13px;border-radius:999px;background:#14263F;color:#FFFFFF;font-weight:700;font-size:12.5px;border:none;cursor:pointer;white-space:nowrap;font-family:inherit;',
@@ -427,7 +424,7 @@
       email: state.email || '',
       createdAt: new Date().toISOString(),
     };
-    try { localStorage.setItem('jst_estimate', JSON.stringify(payload)); } catch (e) {}
+    JST.saveEstimate(payload);
     window.location.href = 'inquiry.html?mode=write&from=estimate';
   }
 
@@ -530,7 +527,7 @@
   });
 
   window.addEventListener('storage', function (e) {
-    if (!e || e.key === 'jst_catalog') { catalog = JST.loadCatalog(); renderAll(); }
+    if (!e || e.key === JST.KEYS.catalog) { catalog = JST.loadCatalog(); renderAll(); }
   });
 
   renderAll();

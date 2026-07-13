@@ -63,8 +63,7 @@
   }
 
   function saveTripInfo(target) {
-    var info = { undecided: state.undecided, start: state.start, end: state.end, adult: state.adult, child: state.child };
-    try { localStorage.setItem('jst_trip_info', JSON.stringify(info)); } catch (e) {}
+    JST.saveTripInfo({ undecided: state.undecided, start: state.start, end: state.end, adult: state.adult, child: state.child });
     if (target.indexOf('#') === 0) window.location.hash = target.slice(1);
     else window.location.href = target;
   }
@@ -123,7 +122,7 @@
   }
 
   window.addEventListener('storage', function (e) {
-    if (!e || e.key === 'jst_notices' || e.key === 'jst_inquiries') renderPreviews();
+    if (!e || e.key === JST.KEYS.notices || e.key === JST.KEYS.inquiries) renderPreviews();
   });
 
   renderPlanner();
