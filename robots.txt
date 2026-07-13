@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin*.html
+Disallow: /ski-rent-shop/admin*.html
+
+Sitemap: https://rosookwan.github.io/ski-rent-shop/sitemap.xml
