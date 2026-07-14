@@ -79,7 +79,7 @@ window.JST = (function () {
         '</div>' +
         '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-top:4px;">' +
           '<span style="font-size:12px;color:rgba(255,255,255,.4);">© 2026 Junskitown. All rights reserved.</span>' +
-          '<a href="admin-login.html" style="font-size:12px;color:rgba(255,255,255,.35);text-decoration:none;">관리자</a>' +
+          '<a href="' + (window.JSTConfig.ADMIN_URL || 'admin-login.html') + '" style="font-size:12px;color:rgba(255,255,255,.35);text-decoration:none;">관리자</a>' +
         '</div>' +
       '</div>';
     if (!opts.hideMobileBar) {
