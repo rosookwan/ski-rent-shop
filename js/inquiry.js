@@ -14,6 +14,26 @@
     };
   }
 
+  function formatContact(value) {
+    var digits = String(value || '').replace(/\D/g, '');
+    if (digits.indexOf('02') === 0) {
+      digits = digits.slice(0, 10);
+      if (digits.length <= 2) return digits;
+      if (digits.length <= 5) return digits.slice(0, 2) + '-' + digits.slice(2);
+      if (digits.length <= 9) return digits.slice(0, 2) + '-' + digits.slice(2, 5) + '-' + digits.slice(5);
+      return digits.slice(0, 2) + '-' + digits.slice(2, 6) + '-' + digits.slice(6);
+    }
+    digits = digits.slice(0, 11);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 7) return digits.slice(0, 3) + '-' + digits.slice(3);
+    if (digits.length <= 10) return digits.slice(0, 3) + '-' + digits.slice(3, 6) + '-' + digits.slice(6);
+    return digits.slice(0, 3) + '-' + digits.slice(3, 7) + '-' + digits.slice(7);
+  }
+
+  function isValidContact(value) {
+    return /^(?:02-\d{3,4}-\d{4}|0\d{2}-\d{3,4}-\d{4})$/.test(value);
+  }
+
   var state = Object.assign({
     activeTab: 'list', selectedId: null, page: 1,
     viewPassword: '', viewPasswordError: '', unlockedInquiryIds: {},
@@ -94,6 +114,8 @@
   async function submit() {
     if (state.submitting) return;
     if (!state.name.trim()) { state.formError = '이름을 입력해주세요'; render(); return; }
+    if (!state.contact.trim()) { state.formError = '연락처를 입력해주세요'; render(); return; }
+    if (!isValidContact(state.contact.trim())) { state.formError = '연락처를 끝까지 입력해주세요'; render(); return; }
     if (!state.title.trim()) { state.formError = '제목을 입력해주세요'; render(); return; }
     if (!state.fromEstimate && !state.content.trim()) { state.formError = '내용을 입력해주세요'; render(); return; }
     if (state.secretChecked && !state.password.trim()) { state.formError = '비밀글 비밀번호를 입력해주세요'; render(); return; }
@@ -380,8 +402,8 @@
           '<input type="text" data-input="name" value="' + esc(state.name) + '" placeholder="이름을 알려주세요" style="' + inputStyle + '" />' +
         '</div>' +
         '<div style="display:flex;flex-direction:column;gap:6px;">' +
-          '<label style="font-size:12.5px;font-weight:700;color:#4B5563;">연락처</label>' +
-          '<input type="text" data-input="contact" value="' + esc(state.contact) + '" placeholder="010-0000-0000" style="' + inputStyle + '" />' +
+          '<label style="font-size:12.5px;font-weight:700;color:#4B5563;">연락처 <span style="color:#E85425;">*</span></label>' +
+          '<input type="tel" inputmode="numeric" autocomplete="tel" maxlength="13" required aria-required="true" data-input="contact" value="' + esc(state.contact) + '" placeholder="010-0000-0000" style="' + inputStyle + '" />' +
         '</div>' +
       '</div>' +
       '<div style="display:flex;flex-direction:column;gap:6px;">' +
@@ -481,7 +503,11 @@
     if (!el) return;
     var k = el.dataset.input;
     if (k === 'name') { state.name = el.value; state.formError = ''; }
-    else if (k === 'contact') state.contact = el.value;
+    else if (k === 'contact') {
+      state.contact = formatContact(el.value);
+      el.value = state.contact;
+      state.formError = '';
+    }
     else if (k === 'email') state.email = el.value;
     else if (k === 'title') { state.title = el.value; state.formError = ''; }
     else if (k === 'content') { state.content = el.value; state.formError = ''; }

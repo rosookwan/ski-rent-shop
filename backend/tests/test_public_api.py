@@ -156,6 +156,7 @@ class PublicApiTests(unittest.TestCase):
             "/api/inquiries",
             json={
                 "name": "김준",
+                "contact": "010-9876-5432",
                 "title": "주차 문의",
                 "content": "주차장을 이용할 수 있나요?",
                 "secret": False,
@@ -178,10 +179,11 @@ class PublicApiTests(unittest.TestCase):
 
     def test_invalid_inquiry_and_oversized_page_are_rejected(self) -> None:
         invalid_payloads = [
-            {"name": "", "title": "제목", "content": "내용", "secret": False},
-            {"name": "홍길동", "title": "제목", "content": "", "secret": False},
-            {"name": "홍길동", "title": "제목", "content": "내용", "secret": True, "password": "12"},
-            {"name": "홍길동", "title": "제목", "content": "내용", "secret": False, "email": "invalid"},
+            {"name": "", "contact": "010-1234-5678", "title": "제목", "content": "내용", "secret": False},
+            {"name": "홍길동", "contact": "010-1234-5678", "title": "제목", "content": "", "secret": False},
+            {"name": "홍길동", "contact": "010-1234-5678", "title": "제목", "content": "내용", "secret": True, "password": "12"},
+            {"name": "홍길동", "contact": "010-1234-5678", "title": "제목", "content": "내용", "secret": False, "email": "invalid"},
+            {"name": "홍길동", "title": "제목", "content": "내용", "secret": False},
             {"name": "홍길동", "title": "제목", "content": "내용", "secret": False, "contact": "전화주세요"},
         ]
 

@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 
 EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
-CONTACT_PATTERN = re.compile(r"^[0-9+() .-]{7,30}$")
+CONTACT_PATTERN = re.compile(r"^(?:02-\d{3,4}-\d{4}|0\d{2}-\d{3,4}-\d{4})$")
 Category = Literal["lift", "equipment", "clothing", "safety"]
 
 
@@ -103,7 +103,7 @@ class EstimatePayload(StrictModel):
 
 class InquiryCreate(StrictModel):
     name: str = Field(min_length=1, max_length=50)
-    contact: str = Field(default="", max_length=30)
+    contact: str = Field(min_length=1, max_length=30)
     email: str = Field(default="", max_length=254)
     title: str = Field(min_length=1, max_length=120)
     content: str = Field(default="", max_length=5_000)
@@ -121,7 +121,7 @@ class InquiryCreate(StrictModel):
     @field_validator("contact")
     @classmethod
     def validate_contact(cls, value: str) -> str:
-        if value and not CONTACT_PATTERN.fullmatch(value):
+        if not CONTACT_PATTERN.fullmatch(value):
             raise ValueError("연락처 형식이 올바르지 않습니다.")
         return value
 
