@@ -4,8 +4,21 @@
     {
       "name": "static",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8080"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8080"
+      ],
       "port": 8080
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd backend && mkdir -p data uploads && JST_DB_PATH=./data/junski.db JST_UPLOAD_DIR=./uploads JST_ALLOWED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080 .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000"
+      ],
+      "port": 8000
     }
   ]
 }

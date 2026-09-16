@@ -17,7 +17,7 @@ docs/            # 개발계획서 · 아키텍처 · 마일스톤별 요구사�
 
 | 페이지 | 디자인 원본 | 설명 |
 |---|---|---|
-| `index.html` + `js/home.js` | Home.dc.html | 홈 (히어로, 여행 준비 플로우, 제휴 숙소, 게시판 미리보기, 오시는길) |
+| `index.html` + `js/home.js` + `js/hero.js` | Home.dc.html | 홈 (스크롤 스토리 히어로, 여행 준비 플로우, 제휴 숙소, 게시판 미리보기, 오시는길) |
 | `notice.html` + `js/notice.js` | NoticeBoard.dc.html | 공지사항 (목록/상세, 더보기) |
 | `inquiry.html` + `js/inquiry.js` | InquiryBoard.dc.html | 문의게시판 (목록/상세/글쓰기, 셀프견적 첨부·할인 계산) |
 | `estimate.html` + `js/estimate.js` | SelfEstimate.dc.html | 셀프견적 (일정·인원, 날짜별 리프트권/렌탈 담기, 문의 연동) |

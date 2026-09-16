@@ -36,43 +36,183 @@
 }
 </script>
 <style>
-  .hero{
-    background-color:#14263F;
-    background-image:linear-gradient(180deg, rgba(20,38,63,0) 78%, #F5F6F8 100%), linear-gradient(100deg, rgba(20,38,63,.95) 0%, rgba(20,38,63,.82) 34%, rgba(20,38,63,.40) 66%, rgba(20,38,63,.10) 100%), url('assets/img/skishopImg.jpg');
-    background-size:cover,cover,cover;
-    background-position:center;
-    background-repeat:no-repeat;
-    display:flex;align-items:center;
-    min-height:clamp(480px,68vh,720px);
-  }
-  /* 넓은 화면: 이미지 비율(1538:1023)에 맞춰 세로 노출 최대화 */
+  /* 홈 히어로: 간판 클로즈업에서 스크롤에 따라 뒤로 빠지며 건물 전체가 보이는 스크롤 스토리 (js/hero.js) */
+  #siteHeader{display:none;}   /* 홈은 히어로의 플로팅 네비가 헤더 역할 */
+  .hero{position:relative;height:600vh;background:#0B1628;color:#FFFFFF;}
+  .hero a{color:inherit;}
+  .hero__stage{position:sticky;top:0;height:100svh;overflow:hidden;background:#0B1628;}
+  .hero__photo{position:absolute;left:-30%;top:-30%;width:160%;height:160%;object-fit:contain;object-position:center;will-change:transform;}
+  .hero__blur{position:absolute;inset:-6%;width:112%;height:112%;object-fit:cover;filter:blur(28px) brightness(.55);}
+  .hero__shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,22,40,.55) 0%,rgba(11,22,40,.25) 40%,rgba(11,22,40,.80) 100%);}
+  .hero__snow{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
+  .hero__bar{position:absolute;left:0;bottom:0;height:3px;width:100%;background:rgba(255,255,255,.12);z-index:30;}
+  .hero__bar i{display:block;height:100%;width:0;background:#FF6A3D;}
+
+  /* 플로팅 알약 네비 */
+  .hnav{position:fixed;top:0;left:0;right:0;z-index:50;padding:16px clamp(16px,4vw,40px) 0;display:flex;align-items:center;justify-content:space-between;gap:10px;color:#FFFFFF;}
+  .pill{display:flex;align-items:center;background:rgba(20,38,63,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.10);border-radius:999px;box-shadow:0 8px 30px rgba(0,0,0,.25);}
+  .pill--brand{gap:9px;padding:8px 20px 8px 10px;text-decoration:none;font-weight:800;font-size:15.5px;letter-spacing:-0.02em;color:#FFFFFF;}
+  .pill--brand .logo{width:30px;height:30px;border-radius:9px;background:#14263F;display:flex;align-items:center;justify-content:center;}
+  .pill--links{display:none;gap:2px;padding:6px 8px;}
+  .pill--links a{color:rgba(255,255,255,.72);text-decoration:none;font-size:14px;font-weight:600;padding:9px 18px;border-radius:999px;transition:color .15s,background .15s;cursor:pointer;}
+  .pill--links a:hover,.pill--links a.on{color:#FFFFFF;background:rgba(255,255,255,.10);}
+  .cta{background:#FF6A3D;color:#FFFFFF;font-weight:800;font-size:14.5px;border-radius:999px;padding:13px 22px;text-decoration:none;white-space:nowrap;transition:background .15s;box-shadow:0 8px 30px rgba(255,106,61,.35);display:inline-flex;align-items:center;gap:8px;}
+  .cta:hover{background:#E85425;}
+  .cta--ghost{background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.35);box-shadow:none;}
+  .cta--ghost:hover{background:rgba(255,255,255,.16);}
+  .dots{position:fixed;right:clamp(12px,2.5vw,28px);top:50%;transform:translateY(-50%);z-index:50;display:flex;flex-direction:column;gap:14px;transition:opacity .3s;}
+  .dots.off{opacity:0;pointer-events:none;}
+  .dots button{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;flex-direction:row-reverse;}
+  .dots i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.35);transition:transform .2s,background .2s;}
+  .dots span{font-size:12px;font-weight:700;color:rgba(255,255,255,0);transition:color .2s;white-space:nowrap;}
+  .dots button.on i{background:#FF6A3D;transform:scale(1.5);}
+  .dots button.on span,.dots button:hover span{color:rgba(255,255,255,.85);}
+
+  /* 챕터 패널: 진행도에 따라 hero.js가 opacity/transform 제어 */
+  .panel{position:absolute;inset:0;opacity:0;pointer-events:none;will-change:opacity,transform;}
+  .panel.on{pointer-events:auto;}
+  .panel__inner{position:absolute;left:clamp(16px,5vw,64px);right:clamp(16px,5vw,64px);top:50%;transform:translateY(-50%);display:grid;gap:28px;align-items:center;}
+  .eyebrow{font-size:12.5px;font-weight:800;letter-spacing:.08em;color:#FF6A3D;text-transform:uppercase;margin-bottom:12px;}
+  .h{margin:0;font-size:clamp(30px,5.2vw,64px);font-weight:800;letter-spacing:-0.035em;line-height:1.05;text-shadow:0 10px 40px rgba(0,0,0,.4);}
+  .h em{font-style:normal;color:#FF6A3D;}
+  .lead{margin:14px 0 0;font-size:clamp(14.5px,1.3vw,17px);line-height:1.7;color:rgba(255,255,255,.85);max-width:520px;text-shadow:0 2px 12px rgba(0,0,0,.4);}
+  .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px;}
+  .hero-title{position:absolute;margin:0;font-weight:800;font-size:clamp(52px,14vw,190px);letter-spacing:-0.05em;line-height:.95;white-space:nowrap;text-shadow:0 10px 50px rgba(0,0,0,.45);}
+  .hero-title--1{left:clamp(16px,4vw,40px);top:20%;}
+  .hero-title--2{right:clamp(16px,4vw,40px);top:40%;}
+  .hero-title--3{left:16%;top:60%;color:#FF6A3D;}
+  .hero__desc{position:absolute;left:clamp(16px,4vw,40px);top:49%;max-width:250px;margin:0;font-size:15px;line-height:1.6;color:rgba(255,255,255,.9);font-weight:500;text-shadow:0 2px 12px rgba(0,0,0,.5);}
+  .hint{position:absolute;left:50%;bottom:28px;transform:translateX(-50%);font-size:12.5px;font-weight:700;color:rgba(255,255,255,.7);display:flex;flex-direction:column;align-items:center;gap:6px;letter-spacing:.04em;}
+  .hint i{width:1px;height:34px;background:linear-gradient(180deg,#FFFFFF,rgba(255,255,255,0));animation:hint 1.6s ease-in-out infinite;}
+  @keyframes hint{0%{transform:scaleY(0);transform-origin:top}50%{transform:scaleY(1);transform-origin:top}51%{transform-origin:bottom}100%{transform:scaleY(0);transform-origin:bottom}}
+  .cards{display:grid;gap:12px;}
+  .card{background:rgba(20,38,63,.74);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:18px 20px;box-shadow:0 20px 60px rgba(0,0,0,.35);}
+  .card .tag{display:inline-block;padding:4px 10px;border-radius:999px;background:rgba(255,106,61,.18);color:#FF9A78;font-size:12px;font-weight:700;margin-bottom:8px;}
+  .card .t{font-size:17px;font-weight:800;margin-bottom:4px;display:flex;justify-content:space-between;gap:12px;}
+  .card .t b{color:#FF9A78;font-weight:800;}
+  .card .d{font-size:13.5px;color:rgba(255,255,255,.7);line-height:1.6;}
+  .card a.link{display:inline-block;margin-top:12px;font-size:13.5px;font-weight:700;text-decoration:none;border-bottom:1.5px solid #FF6A3D;padding-bottom:2px;}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .chip{display:flex;align-items:baseline;gap:8px;background:rgba(20,38,63,.74);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:10px 16px;font-size:14px;font-weight:700;}
+  .chip b{color:#FF9A78;font-weight:800;font-size:13px;}
+  .big{font-size:clamp(30px,5vw,56px);font-weight:800;letter-spacing:-0.03em;line-height:1.1;text-decoration:none;display:block;}
+  .big small{display:block;font-size:13px;font-weight:600;color:rgba(255,255,255,.65);letter-spacing:0;margin-bottom:6px;}
+  .note{font-size:12.5px;color:rgba(255,255,255,.6);margin-top:10px;}
   @media (min-width:900px){
-    .hero{
-      min-height:min(calc(100vw * 0.6652), 90vh, 880px);
-    }
+    .pill--links{display:flex;}
+    .panel__inner{grid-template-columns:1.1fr .9fr;gap:48px;}
+    .panel__inner--reverse{grid-template-columns:.9fr 1.1fr;}
+    .hero-title{font-size:clamp(52px,12vw,190px);}
+    .hero-title--3{left:28%;}
   }
+  @media (max-width:899px){
+    .dots span{display:none;}
+    .hero__desc{top:50%;max-width:230px;}
+    .panel__inner{gap:18px;top:52%;}
+  }
+  @media (prefers-reduced-motion:reduce){.hint i{animation:none;} .hero__snow{display:none;}}
 </style>
 </head>
 <body>
 
 <div id="siteHeader"></div>
 
-<section class="hero">
-  <div style="max-width:1200px;margin:0 auto;width:100%;padding:76px clamp(16px,4vw,32px) 64px;display:flex;flex-direction:column;gap:22px;">
-    <div style="font-size:12.5px;font-weight:800;letter-spacing:.06em;color:#FF6A3D;text-transform:uppercase;">MUJU WINTER RENTAL · STAY</div>
-    <h1 style="margin:0;font-size:clamp(28px,6vw,44px);line-height:1.2;font-weight:800;color:#FFFFFF;letter-spacing:-0.02em;max-width:680px;">숙박부터 렌탈까지,<br/>준스키타운에서 한 번에</h1>
-    <p style="margin:0;font-size:16px;line-height:1.7;color:rgba(255,255,255,.82);max-width:520px;">무주리조트 근처 숙박 예약, 스키·보드 렌탈, 리프트권 문의까지 셀프견적 하나로 편하게 준비해보세요.</p>
-    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;">
-      <a href="estimate.html" style="padding:15px 24px;border-radius:13px;background:#FF6A3D;color:#FFFFFF;font-weight:800;font-size:15.5px;text-decoration:none;white-space:nowrap;">셀프견적 시작</a>
-      <a href="inquiry.html" style="padding:15px 24px;border-radius:13px;border:1.5px solid #FFFFFF;color:#FFFFFF;font-weight:700;font-size:15.5px;text-decoration:none;white-space:nowrap;">숙박·렌탈 문의</a>
-    </div>
-    <div style="display:flex;flex-wrap:wrap;gap:8px 10px;margin-top:14px;font-size:13px;color:rgba(255,255,255,.65);font-weight:600;">
-      <span>숙박 안내</span><span>·</span><span>렌탈 품목</span><span>·</span><span>리프트권 문의</span><span>·</span><span>셀프견적 연동</span>
-    </div>
+<nav class="hnav" aria-label="주요 메뉴">
+  <a href="index.html" class="pill pill--brand"><span class="logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M2 18.5L7.5 9.5L11.5 18.5Z" fill="#FF6A3D" fill-opacity="0.5"/><path d="M6.5 18.5L14 4.5L22 18.5Z" fill="#FF6A3D"/><path d="M14 4.5L16.1 8.6L11.9 8.6Z" fill="#FFFFFF"/><circle cx="18.7" cy="6.3" r="1.3" fill="#FFFFFF"/></svg></span>준스키타운</a>
+  <div class="pill pill--links" id="heroNav">
+    <a data-action="go" data-go="1">숙박</a>
+    <a data-action="go" data-go="2">렌탈</a>
+    <a data-action="go" data-go="3">리프트권</a>
+    <a data-action="go" data-go="4">예약·문의</a>
+    <a href="notice.html">공지사항</a>
+    <a href="inquiry.html">문의게시판</a>
+  </div>
+  <a href="estimate.html" class="cta">셀프견적 시작</a>
+</nav>
+<aside class="dots" id="heroDots" aria-label="구간 이동">
+  <button data-action="go" data-go="0"><i></i><span>홈</span></button>
+  <button data-action="go" data-go="1"><i></i><span>숙박</span></button>
+  <button data-action="go" data-go="2"><i></i><span>렌탈</span></button>
+  <button data-action="go" data-go="3"><i></i><span>리프트권·견적</span></button>
+  <button data-action="go" data-go="4"><i></i><span>예약·문의</span></button>
+</aside>
+
+<section class="hero" id="hero">
+  <div class="hero__stage">
+    <img class="hero__blur" src="assets/img/skishopImg.jpg" alt="" aria-hidden="true">
+    <img class="hero__photo" id="heroPhoto" src="assets/img/skishopImg.jpg" alt="무주 준스키타운 매장 전경">
+    <div class="hero__shade"></div>
+    <canvas class="hero__snow" id="heroSnow" aria-hidden="true"></canvas>
+
+    <section class="panel" data-start="0" data-end="0.17" aria-label="소개">
+      <h1 class="hero-title hero-title--1">숙박부터</h1>
+      <h1 class="hero-title hero-title--2">렌탈까지</h1>
+      <h1 class="hero-title hero-title--3">한 번에</h1>
+      <p class="hero__desc">무주리조트 근처 숙박 예약, 스키·보드 렌탈, 리프트권 문의까지 셀프견적 하나로 편하게 준비해보세요.</p>
+      <div class="hint">스크롤하면 뒤로 빠져요<i></i></div>
+    </section>
+
+    <section class="panel" data-start="0.2" data-end="0.4" aria-label="숙박">
+      <div class="panel__inner">
+        <div>
+          <div class="eyebrow">01 · Partner Stay</div>
+          <h2 class="h">무주리조트 인근<br><em>제휴 숙소</em>에서 하루</h2>
+          <p class="lead">리조트형부터 감성 카라반까지. 숙소를 정하면 렌탈 상담과 함께 한 번에 예약할 수 있어요.</p>
+          <div class="actions"><a href="inquiry.html" class="cta">숙박 문의하기</a><a href="#lodging" class="cta cta--ghost">제휴 숙소 보기</a></div>
+        </div>
+        <div class="cards">
+          <div class="card"><span class="tag">리조트형</span><div class="t">무주 나봄리조트</div><div class="d">무주리조트 인근에서 커플·가족 일정 모두 편하게 연결하기 좋아요.</div><a class="link" href="inquiry.html">예약 문의 →</a></div>
+          <div class="card"><span class="tag">카라반</span><div class="t">무주 별빛카라반</div><div class="d">감성적인 카라반 숙소. 숙박과 렌탈 상담을 함께 남겨보세요.</div><a class="link" href="inquiry.html">예약 문의 →</a></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" data-start="0.42" data-end="0.6" aria-label="렌탈">
+      <div class="panel__inner panel__inner--reverse">
+        <div class="chips" id="heroRentalChips" aria-label="렌탈 품목"></div>
+        <div>
+          <div class="eyebrow">02 · Rental</div>
+          <h2 class="h">장비부터 의류·<br>안전장비까지 <em>풀세트</em></h2>
+          <p class="lead">스키·보드 풀세트, 상하의 세트, 헬멧·고글·보호대까지 매장에서 바로 준비돼요. 날짜별로 나눠 담을 수 있습니다.</p>
+          <div class="actions"><a href="estimate.html" class="cta">렌탈 품목 담기</a></div>
+          <p class="note">최종 금액은 셀프견적에서 할인까지 반영해 확인돼요.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" data-start="0.62" data-end="0.8" aria-label="리프트권과 셀프견적">
+      <div class="panel__inner">
+        <div>
+          <div class="eyebrow">03 · Lift Pass · Self Estimate</div>
+          <h2 class="h">리프트권까지 담아<br><em>셀프견적</em> 바로 확인</h2>
+          <p class="lead">일정·인원을 정하고 날짜별로 리프트권과 렌탈을 담으면 견적이 바로 계산돼요. 제휴 할인은 자동으로 적용됩니다.</p>
+          <div class="actions"><a href="estimate.html" class="cta">셀프견적 시작하기 →</a></div>
+        </div>
+        <div class="cards" id="heroLiftCards"></div>
+      </div>
+    </section>
+
+    <section class="panel" data-start="0.83" data-end="1" aria-label="예약과 문의">
+      <div class="panel__inner">
+        <div>
+          <div class="eyebrow">04 · Reservation</div>
+          <h2 class="h">전화 한 통이면<br><em>예약 완료</em></h2>
+          <p class="lead">전화·문자 또는 문의게시판으로 남겨주세요. 셀프견적 내역은 문의 글에 자동으로 첨부돼요.</p>
+          <div class="actions"><a href="inquiry.html" class="cta">문의게시판 글쓰기</a><a href="#visit" class="cta cta--ghost">오시는 길</a></div>
+        </div>
+        <div class="cards">
+          <a class="card big" href="tel:0633220696"><small>매장 전화</small>063-322-0696</a>
+          <a class="card big" href="tel:01094330696"><small>휴대폰</small>010-9433-0696</a>
+          <div class="card"><div class="d">예약계좌</div><div class="t">농협 351-1246-2227-43</div><div class="d">예금주 오용선</div></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="hero__bar"><i id="heroBar"></i></div>
   </div>
 </section>
 
-<section style="max-width:1200px;margin:0 auto;padding:12px clamp(16px,4vw,32px) 48px;">
+<section style="max-width:1200px;margin:0 auto;padding:48px clamp(16px,4vw,32px) 48px;">
   <div style="font-size:12.5px;font-weight:800;letter-spacing:.06em;color:#FF6A3D;text-transform:uppercase;margin-bottom:8px;">TRIP FLOW</div>
   <h2 style="margin:0 0 8px;font-size:clamp(20px,4vw,26px);font-weight:800;color:#14263F;">이 순서로 준비하면 편해요</h2>
   <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#4B5563;max-width:560px;">일정과 인원을 먼저 정하고 숙소를 확인한 뒤, 셀프견적으로 장비까지 이어가보세요.</p>
@@ -189,5 +329,6 @@
 <script src="js/store.js"></script>
 <script src="js/site.js"></script>
 <script src="js/home.js"></script>
+<script src="js/hero.js"></script>
 </body>
 </html>

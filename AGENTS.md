@@ -33,6 +33,7 @@ css/base.css           # 전 페이지 공통 스타일
 js/store.js            # ★ 데이터 계층 — 모든 localStorage 접근은 여기서만
 js/site.js             # 사용자 화면 공통(헤더/푸터). JSTStore를 포함해 JST로 노출
 js/{home,notice,inquiry,estimate}.js  # 사용자 페이지 로직
+js/hero.js             # 홈 히어로(스크롤 스토리) — index.html에서 home.js 다음에 로드
 js/admin.js            # 관리자 페이지 로직 (site.js 미사용, store.js만 사용)
 assets/img/            # 이미지
 docs/                  # 계획서·아키텍처·요구사항

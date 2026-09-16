@@ -6,7 +6,8 @@
 
 ```
 ┌─ 페이지 스크립트 ──────────────────────────────────────────┐
-│ js/home.js  js/notice.js  js/inquiry.js  js/estimate.js    │  화면 상태·렌더링
+│ js/home.js  js/hero.js  js/notice.js  js/inquiry.js        │  화면 상태·렌더링
+│ js/estimate.js                                             │
 │ js/admin.js                                                │
 ├─ 공통 UI (사용자 화면만) ──────────────────────────────────┤
 │ js/site.js   → window.JST (JSTStore 포함 + 헤더/푸터)      │  헤더·푸터 주입
@@ -26,7 +27,7 @@
 
 | 페이지 | 스크립트 | 역할 | 이동 경로 |
 |---|---|---|---|
-| index.html | home.js | 홈. 일정·인원 플래너, 게시판 미리보기 | 플래너 → estimate.html (jst_trip_info 전달) |
+| index.html | home.js, hero.js | 홈. 스크롤 스토리 히어로(hero.js: 사진 줌아웃·챕터 패널·카탈로그 표시), 일정·인원 플래너, 게시판 미리보기 | 플래너 → estimate.html (jst_trip_info 전달) |
 | notice.html | notice.js | 공지 목록/상세. `?id=N`으로 상세 직접 진입 | |
 | inquiry.html | inquiry.js | 문의 목록/상세/글쓰기. `?mode=write&from=estimate`로 견적 첨부 글쓰기 진입 | |
 | estimate.html | estimate.js | 셀프견적. 날짜별 담기, 확인 모달 | 문의하기 → inquiry.html (jst_estimate 전달) |
