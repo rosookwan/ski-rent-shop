@@ -36,15 +36,17 @@
 }
 </script>
 <style>
-  /* 홈 히어로: 간판 클로즈업에서 스크롤에 따라 뒤로 빠지며 건물 전체가 보이는 스크롤 스토리 (js/hero.js) */
+  /* 홈 히어로: 스크롤에 맞춰 영상 프레임과 안내 패널 전환 (js/hero.js) */
   #siteHeader{display:none;}   /* 홈은 히어로의 플로팅 네비가 헤더 역할 */
-  .hero{position:relative;height:600vh;background:#0B1628;color:#FFFFFF;}
+  .hero{position:relative;height:1000vh;background:#0B1628;color:#FFFFFF;}
   .hero a{color:inherit;}
   .hero__stage{position:sticky;top:0;height:100svh;overflow:hidden;background:#0B1628;}
-  .hero__photo{position:absolute;left:-30%;top:-30%;width:160%;height:160%;object-fit:contain;object-position:center;will-change:transform;}
+  .hero__photo,.hero__video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:center;}
+  .hero__video{opacity:0;pointer-events:none;}
+  .hero__video.is-ready{opacity:1;}
   .hero__blur{position:absolute;inset:-6%;width:112%;height:112%;object-fit:cover;filter:blur(28px) brightness(.55);}
-  .hero__shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,22,40,.55) 0%,rgba(11,22,40,.25) 40%,rgba(11,22,40,.80) 100%);}
-  .hero__snow{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
+  .hero__shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,22,40,.2) 0%,rgba(11,22,40,.08) 35%,rgba(11,22,40,.72) 78%,rgba(11,22,40,.92) 100%);pointer-events:none;}
+  .hero--details .hero__shade{background:linear-gradient(180deg,rgba(11,22,40,.55),rgba(11,22,40,.72) 45%,rgba(11,22,40,.9));}
   .hero__bar{position:absolute;left:0;bottom:0;height:3px;width:100%;background:rgba(255,255,255,.12);z-index:30;}
   .hero__bar i{display:block;height:100%;width:0;background:#FF6A3D;}
 
@@ -77,11 +79,10 @@
   .h em{font-style:normal;color:#FF6A3D;}
   .lead{margin:14px 0 0;font-size:clamp(14.5px,1.3vw,17px);line-height:1.7;color:rgba(255,255,255,.85);max-width:520px;text-shadow:0 2px 12px rgba(0,0,0,.4);}
   .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px;}
-  .hero-title{position:absolute;margin:0;font-weight:800;font-size:clamp(52px,14vw,190px);letter-spacing:-0.05em;line-height:.95;white-space:nowrap;text-shadow:0 10px 50px rgba(0,0,0,.45);}
-  .hero-title--1{left:clamp(16px,4vw,40px);top:20%;}
-  .hero-title--2{right:clamp(16px,4vw,40px);top:40%;}
-  .hero-title--3{left:16%;top:60%;color:#FF6A3D;}
-  .hero__desc{position:absolute;left:clamp(16px,4vw,40px);top:49%;max-width:250px;margin:0;font-size:15px;line-height:1.6;color:rgba(255,255,255,.9);font-weight:500;text-shadow:0 2px 12px rgba(0,0,0,.5);}
+  .hero__intro{position:absolute;left:clamp(16px,4vw,56px);right:clamp(32px,4vw,56px);bottom:100px;max-width:560px;}
+  .hero-title{margin:0;font-weight:800;font-size:clamp(34px,4.5vw,64px);letter-spacing:-0.04em;line-height:1.12;text-shadow:0 4px 24px rgba(0,0,0,.45);}
+  .hero-title em{font-style:normal;color:#FF6A3D;}
+  .hero__desc{max-width:430px;margin:16px 0 0;font-size:15px;line-height:1.7;color:rgba(255,255,255,.9);font-weight:500;text-shadow:0 2px 12px rgba(0,0,0,.5);}
   .hint{position:absolute;left:50%;bottom:28px;transform:translateX(-50%);font-size:12.5px;font-weight:700;color:rgba(255,255,255,.7);display:flex;flex-direction:column;align-items:center;gap:6px;letter-spacing:.04em;}
   .hint i{width:1px;height:34px;background:linear-gradient(180deg,#FFFFFF,rgba(255,255,255,0));animation:hint 1.6s ease-in-out infinite;}
   @keyframes hint{0%{transform:scaleY(0);transform-origin:top}50%{transform:scaleY(1);transform-origin:top}51%{transform-origin:bottom}100%{transform:scaleY(0);transform-origin:bottom}}
@@ -102,15 +103,20 @@
     .pill--links{display:flex;}
     .panel__inner{grid-template-columns:1.1fr .9fr;gap:48px;}
     .panel__inner--reverse{grid-template-columns:.9fr 1.1fr;}
-    .hero-title{font-size:clamp(52px,12vw,190px);}
-    .hero-title--3{left:28%;}
   }
   @media (max-width:899px){
     .dots span{display:none;}
-    .hero__desc{top:50%;max-width:230px;}
+    .hero__photo,.hero__video{object-position:center 30%;}
+    .hero__blur{filter:blur(28px) brightness(.3);}
+    .hero__intro{bottom:calc(160px + env(safe-area-inset-bottom));max-width:460px;}
+    .hero__desc{font-size:14px;margin-top:12px;}
+    .hint{left:16px;bottom:calc(94px + env(safe-area-inset-bottom));transform:none;align-items:flex-start;font-size:11px;}
+    .hint i{height:22px;}
     .panel__inner{gap:18px;top:52%;}
   }
-  @media (prefers-reduced-motion:reduce){.hint i{animation:none;} .hero__snow{display:none;}}
+  @media (max-height:600px){.hero__intro{bottom:76px;}.hero-title{font-size:32px;}.hero__desc{font-size:13px;max-width:380px;margin-top:8px;}}
+  @media (max-width:899px) and (max-height:600px){.hero__photo,.hero__video{object-position:center 18%;}.hero__intro{bottom:150px;}.hero-title{font-size:28px;}.hero__desc{font-size:12px;}}
+  @media (prefers-reduced-motion:reduce){.hint i{animation:none;}}
 </style>
 </head>
 <body>
@@ -139,17 +145,17 @@
 
 <section class="hero" id="hero">
   <div class="hero__stage">
-    <img class="hero__blur" src="assets/img/skishopImg.jpg" alt="" aria-hidden="true">
-    <img class="hero__photo" id="heroPhoto" src="assets/img/skishopImg.jpg" alt="무주 준스키타운 매장 전경">
+    <img class="hero__blur" src="assets/img/junski-hero-poster.jpg" alt="" aria-hidden="true">
+    <img class="hero__photo" src="assets/img/junski-hero-poster.jpg" alt="무주 준스키타운 겨울밤 매장 전경" fetchpriority="high">
+    <video class="hero__video" id="heroVideo" muted playsinline preload="none" poster="assets/img/junski-hero-poster.jpg" data-src="assets/video/junski-hero.mp4" data-mobile-src="assets/video/junski-hero-mobile.mp4" aria-hidden="true"></video>
     <div class="hero__shade"></div>
-    <canvas class="hero__snow" id="heroSnow" aria-hidden="true"></canvas>
 
     <section class="panel" data-start="0" data-end="0.17" aria-label="소개">
-      <h1 class="hero-title hero-title--1">숙박부터</h1>
-      <h1 class="hero-title hero-title--2">렌탈까지</h1>
-      <h1 class="hero-title hero-title--3">한 번에</h1>
-      <p class="hero__desc">무주리조트 근처 숙박 예약, 스키·보드 렌탈, 리프트권 문의까지 셀프견적 하나로 편하게 준비해보세요.</p>
-      <div class="hint">스크롤하면 뒤로 빠져요<i></i></div>
+      <div class="hero__intro">
+        <h1 class="hero-title">숙박부터 렌탈까지<br><em>한 번에</em></h1>
+        <p class="hero__desc">무주리조트 근처 숙박 예약, 스키·보드 렌탈, 리프트권 문의까지 셀프견적 하나로 편하게 준비해보세요.</p>
+      </div>
+      <div class="hint">스크롤하면 영상이 움직여요<i></i></div>
     </section>
 
     <section class="panel" data-start="0.2" data-end="0.4" aria-label="숙박">

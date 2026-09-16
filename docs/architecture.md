@@ -27,7 +27,7 @@
 
 | 페이지 | 스크립트 | 역할 | 이동 경로 |
 |---|---|---|---|
-| index.html | home.js, hero.js | 홈. 스크롤 스토리 히어로(hero.js: 사진 줌아웃·챕터 패널·카탈로그 표시), 일정·인원 플래너, 게시판 미리보기 | 플래너 → estimate.html (jst_trip_info 전달) |
+| index.html | home.js, hero.js | 홈. 스크롤 스토리 히어로(hero.js: 스크롤 연동 영상·챕터 패널·카탈로그 표시), 일정·인원 플래너, 게시판 미리보기 | 플래너 → estimate.html (jst_trip_info 전달) |
 | notice.html | notice.js | 공지 목록/상세. `?id=N`으로 상세 직접 진입 | |
 | inquiry.html | inquiry.js | 문의 목록/상세/글쓰기. `?mode=write&from=estimate`로 견적 첨부 글쓰기 진입 | |
 | estimate.html | estimate.js | 셀프견적. 날짜별 담기, 확인 모달 | 문의하기 → inquiry.html (jst_estimate 전달) |
@@ -114,3 +114,13 @@ Nginx ── FastAPI(systemd, 전용 사용자) ── SQLite
 - 백엔드와 데이터는 테니스 웹·알림 봇의 사용자 및 디렉터리와 분리한다.
 - SQLite 접근 코드는 저장소 계층에 모아 향후 PostgreSQL 전환 범위를 제한한다.
 - 상세 단계와 완료 기준은 `docs/requirements/M3-backend-migration.md`를 따른다.
+
+### 홈 배경 영상
+
+- `assets/video/junski-hero.mp4`: 승인된 매장 영상의 1080p H.264 배포본.
+- `assets/video/junski-hero-mobile.mp4`: 모바일용 720p 배포본. 두 영상 모두 오디오를 제거하고 faststart와 모든 프레임을 독립적으로 탐색할 수 있는 키프레임 인코딩을 적용한다.
+- 영상은 자동 재생하지 않는다. 히어로의 스크롤 진행률을 영상의 재생 시점에 연결한다. 아래로 스크롤하면 진행하고, 멈추면 정지하며, 위로 올리면 되감긴다. 안내 패널도 같은 스크롤 구간에 맞춰 전환한다.
+- 영상은 항상 일시정지 상태에서 24fps 프레임 단위로 탐색한다. 탐색이 진행 중이면 완료 후 가장 최근 스크롤 위치를 반영하며, 끝에서는 마지막 실제 프레임을 유지한다.
+- 히어로 높이는 1000vh로, 영상 진행에 9화면 길이의 스크롤을 사용한다. 영상과 안내 패널은 약 180ms의 시간 기반 완충을 함께 적용해 급한 휠·터치 입력을 부드럽게 따라간 뒤 정지한다. 원본 8초 영상의 장면이나 재생 속도를 변형하지 않는다.
+- 동작 줄이기 또는 데이터 절약 설정에서는 자동으로 영상을 내려받지 않고 포스터를 표시한다.
+- `assets/img/junski-hero-poster.jpg`는 초기 화면과 영상 실패 시 대체 이미지다. 모바일에서는 가로 영상 전체를 보여준다.
